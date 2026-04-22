@@ -399,8 +399,6 @@ canvas { display: block; width: 100%; height: 100%; }
   overflow: hidden;
 }
 .video-placeholder {
-  z-index: 2;
-
   position: absolute;
   inset: 0;
   display: flex;
@@ -421,9 +419,6 @@ canvas { display: block; width: 100%; height: 100%; }
   max-width: 34ch;
 }
 .youtube-frame {
-  position: relative;
-  z-index: 3;
-
   width: 100%;
   height: 100%;
   border: 0;
@@ -863,6 +858,7 @@ function loadLocalVideoFile(file) {
   const finish = () => {
     connectMediaElementForAnalysis(localVideo, 'video');
     updateTrackDisplay(file.name.replace(/\.[^.]+$/, ''), localVideo.duration || 0);
+    refreshTotalDurationFromActiveMedia();
     setSourceStatus('Audio source: uploaded video');
     playBtn.disabled = false;
     playBtn.removeAttribute('disabled');
@@ -983,8 +979,9 @@ function getActiveMediaElement() {
 
 function updateTrackDisplay(name, durationSeconds) {
   document.getElementById('trackName').textContent = name || '—';
-  document.getElementById('trackDur').textContent = fmt(durationSeconds || 0);
-  totTimeEl.textContent = fmt(durationSeconds || 0);
+  const safeDuration = Number(durationSeconds || 0);
+  document.getElementById('trackDur').textContent = fmt(safeDuration);
+  totTimeEl.textContent = fmt(safeDuration);
   trackInfo.style.display = 'flex';
 }
 
@@ -1073,6 +1070,7 @@ async function loadFile(file) {
 
   connectMediaElementForAnalysis(audioEl, 'audio');
   updateTrackDisplay(file.name.replace(/\.[^.]+$/, ''), audioEl.duration || 0);
+  refreshTotalDurationFromActiveMedia();
   setSourceStatus('Audio source: MP3 / audio file');
   pauseOffset = 0;
   beatHistory = [];
@@ -1148,12 +1146,30 @@ playBtn.addEventListener('click', async () => {
   }
 });
 
+
+function refreshTotalDurationFromActiveMedia() {
+  const activeEl = getActiveMediaElement();
+  if (!activeEl) return;
+  const duration = Number(activeEl.duration || 0);
+  if (Number.isFinite(duration) && duration > 0) {
+    totTimeEl.textContent = fmt(duration);
+    const trackDurEl = document.getElementById('trackDur');
+    if (trackDurEl) trackDurEl.textContent = fmt(duration);
+  }
+}
+
 function refreshProgressFromActiveMedia() {
   const activeEl = getActiveMediaElement();
-  if (!activeEl || !activeEl.duration) return;
-  const t = activeEl.currentTime || 0;
-  const p = Math.min(t / activeEl.duration, 1);
-  progressFill.style.width = Math.round(p * 100) + '%';
+  if (!activeEl) return;
+  const duration = Number(activeEl.duration || 0);
+  const t = Number(activeEl.currentTime || 0);
+  if (duration > 0) {
+    const p = Math.min(t / duration, 1);
+    progressFill.style.width = Math.round(p * 100) + '%';
+    totTimeEl.textContent = fmt(duration);
+  } else {
+    progressFill.style.width = '0%';
+  }
   curTimeEl.textContent = fmt(t);
 }
 
@@ -1163,6 +1179,7 @@ function refreshProgressFromActiveMedia() {
   el.addEventListener('loadedmetadata', () => {
     if ((el === audioEl && currentAudioSourceType === 'audio') || (el === localVideo && currentAudioSourceType === 'video')) {
       updateTrackDisplay(document.getElementById('trackName').textContent || '—', el.duration || 0);
+      refreshTotalDurationFromActiveMedia();
       refreshProgressFromActiveMedia();
     }
   });
@@ -1989,6 +2006,25 @@ youtubeUrlInput.addEventListener('keydown', e => {
       pauseOffset = el.currentTime || 0;
     }
   });
+});
+
+
+audioEl.addEventListener('seeked', () => {
+  if (currentAudioSourceType === 'audio') {
+    pauseOffset = audioEl.currentTime || 0;
+    refreshProgressFromActiveMedia();
+    currentRenderedCueKey = '';
+    updateDisplayedCaption(true);
+    syncVideoSeek(pauseOffset);
+  }
+});
+localVideo.addEventListener('seeked', () => {
+  if (currentAudioSourceType === 'video') {
+    pauseOffset = localVideo.currentTime || 0;
+    refreshProgressFromActiveMedia();
+    currentRenderedCueKey = '';
+    updateDisplayedCaption(true);
+  }
 });
 
 </script>

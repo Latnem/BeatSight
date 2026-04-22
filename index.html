@@ -849,15 +849,22 @@ function loadLocalVideoFile(file) {
   const objectUrl = URL.createObjectURL(file);
   youtubeFrame.src = '';
   youtubeFrame.hidden = true;
+  localVideo.pause();
   localVideo.src = objectUrl;
   localVideo.hidden = false;
   videoPlaceholder.hidden = true;
   showVideoPanel();
-  setYouTubeStatus(`Local video loaded · ${file.name}`);
-  connectMediaElementForAnalysis(localVideo, 'video');
-  updateTrackDisplay(file.name.replace(/\.[^.]+$/, ''), localVideo.duration || 0);
-  setSourceStatus('Audio source: uploaded video');
-  syncPlayerStateFromMedia();
+
+  const finish = () => {
+    connectMediaElementForAnalysis(localVideo, 'video');
+    updateTrackDisplay(file.name.replace(/\.[^.]+$/, ''), localVideo.duration || 0);
+    setSourceStatus('Audio source: uploaded video');
+    syncPlayerStateFromMedia();
+    setYouTubeStatus(`Local video loaded · ${file.name}`);
+  };
+
+  if (localVideo.readyState >= 1) finish();
+  else localVideo.addEventListener('loadedmetadata', finish, { once: true });
 }
 
 
@@ -1039,6 +1046,7 @@ async function ensureAudioContext() {
   }
 }
 
+
 async function loadFile(file) {
   ensureAudioEngine();
   const objectUrl = URL.createObjectURL(file);
@@ -1054,11 +1062,12 @@ async function loadFile(file) {
   updateTrackDisplay(file.name.replace(/\.[^.]+$/, ''), audioEl.duration || 0);
   setSourceStatus('Audio source: MP3 / audio file');
   pauseOffset = 0;
-  beatHistory = []; bpmEstimate = 0;
+  beatHistory = [];
+  bpmEstimate = 0;
   bpmNum.textContent = '—';
   currentRenderedCueKey = '';
   playBtn.disabled = false;
-  if (audioCtx.state === 'suspended') {
+  if (audioCtx && audioCtx.state === 'suspended') {
     try { await audioCtx.resume(); } catch(e) {}
   }
 }
@@ -1076,13 +1085,17 @@ uploadZone.addEventListener('drop', e => {
 });
 
 async function startPlayback() {
-  if (!audioEl.src) return;
-  await ensureAudioContext();
+  const activeEl = getActiveMediaElement();
+  if (!activeEl) return;
+  ensureAudioEngine();
+  if (audioCtx && audioCtx.state === 'suspended') {
+    try { await audioCtx.resume(); } catch (e) {}
+  }
   try {
-    await audioEl.play();
-    playing = true;
-    playIcon.innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
-    cancelAnimationFrame(window._animFrame);
+    await activeEl.play();
+    syncPlayerStateFromMedia();
+    if (currentAudioSourceType === 'audio') syncVideoPlay();
+    cancelAnimationFrame(animFrame);
     draw();
     updateDisplayedCaption(true);
   } catch (err) {
@@ -1091,67 +1104,122 @@ async function startPlayback() {
 }
 
 function pausePlayback() {
-  audioEl.pause();
-  playing = false;
-  playIcon.innerHTML = '<path d="M8 5v14l11-7z"/>';
+  const activeEl = getActiveMediaElement();
+  if (!activeEl) return;
+  activeEl.pause();
+  syncPlayerStateFromMedia();
+  if (currentAudioSourceType === 'audio') syncVideoPause();
   updateDisplayedCaption(true);
 }
 
 playBtn.addEventListener('click', async () => {
-  if (!audioEl.src) return;
-  if (playing) pausePlayback();
-  else await startPlayback();
+  const activeEl = getActiveMediaElement();
+  if (!activeEl) return;
+  if (activeEl.paused || activeEl.ended) await startPlayback();
+  else pausePlayback();
 });
 
-audioEl.addEventListener('timeupdate', () => {
-  const p = audioEl.duration ? Math.min(audioEl.currentTime / audioEl.duration, 1) : 0;
-  progressFill.style.width = Math.round(p*100) + '%';
-  curTimeEl.textContent = fmt(audioEl.currentTime);
-  updateDisplayedCaption();
-});
-audioEl.addEventListener('seeking', () => {
-  currentRenderedCueKey = '';
-  updateDisplayedCaption(true);
-});
-audioEl.addEventListener('seeked', () => {
-  currentRenderedCueKey = '';
-  updateDisplayedCaption(true);
-});
-audioEl.addEventListener('pause', () => {
-  currentRenderedCueKey = '';
-  updateDisplayedCaption(true);
-});
-audioEl.addEventListener('play', () => {
-  currentRenderedCueKey = '';
-  updateDisplayedCaption(true);
-});
-audioEl.addEventListener('ratechange', () => {
-  currentRenderedCueKey = '';
-  updateDisplayedCaption(true);
-});
-audioEl.addEventListener('ended', () => {
-  playing = false;
-  playIcon.innerHTML = '<path d="M8 5v14l11-7z"/>';
-  progressFill.style.width = '0%';
-  curTimeEl.textContent = '0:00';
-  currentCueIndex = -1;
-  currentRenderedCueKey = '';
-  updateDisplayedCaption(true);
+function refreshProgressFromActiveMedia() {
+  const activeEl = getActiveMediaElement();
+  if (!activeEl || !activeEl.duration) return;
+  const t = activeEl.currentTime || 0;
+  const p = Math.min(t / activeEl.duration, 1);
+  progressFill.style.width = Math.round(p * 100) + '%';
+  curTimeEl.textContent = fmt(t);
+}
+
+[audioEl, localVideo].forEach(el => {
+  if (!el) return;
+
+  el.addEventListener('loadedmetadata', () => {
+    if ((el === audioEl && currentAudioSourceType === 'audio') || (el === localVideo && currentAudioSourceType === 'video')) {
+      updateTrackDisplay(document.getElementById('trackName').textContent || '—', el.duration || 0);
+      refreshProgressFromActiveMedia();
+    }
+  });
+
+  el.addEventListener('timeupdate', () => {
+    if ((el === audioEl && currentAudioSourceType === 'audio') || (el === localVideo && currentAudioSourceType === 'video')) {
+      pauseOffset = el.currentTime || 0;
+      refreshProgressFromActiveMedia();
+      updateDisplayedCaption();
+    }
+  });
+
+  el.addEventListener('play', () => {
+    if ((el === audioEl && currentAudioSourceType === 'audio') || (el === localVideo && currentAudioSourceType === 'video')) {
+      syncPlayerStateFromMedia();
+      currentRenderedCueKey = '';
+      cancelAnimationFrame(animFrame);
+      draw();
+      updateDisplayedCaption(true);
+    }
+  });
+
+  el.addEventListener('pause', () => {
+    if ((el === audioEl && currentAudioSourceType === 'audio') || (el === localVideo && currentAudioSourceType === 'video')) {
+      syncPlayerStateFromMedia();
+      currentRenderedCueKey = '';
+      updateDisplayedCaption(true);
+    }
+  });
+
+  el.addEventListener('seeking', () => {
+    if ((el === audioEl && currentAudioSourceType === 'audio') || (el === localVideo && currentAudioSourceType === 'video')) {
+      currentRenderedCueKey = '';
+      refreshProgressFromActiveMedia();
+      updateDisplayedCaption(true);
+    }
+  });
+
+  el.addEventListener('seeked', () => {
+    if ((el === audioEl && currentAudioSourceType === 'audio') || (el === localVideo && currentAudioSourceType === 'video')) {
+      pauseOffset = el.currentTime || 0;
+      currentRenderedCueKey = '';
+      refreshProgressFromActiveMedia();
+      updateDisplayedCaption(true);
+    }
+  });
+
+  el.addEventListener('ended', () => {
+    if ((el === audioEl && currentAudioSourceType === 'audio') || (el === localVideo && currentAudioSourceType === 'video')) {
+      syncPlayerStateFromMedia();
+      progressFill.style.width = '0%';
+      curTimeEl.textContent = '0:00';
+      currentCueIndex = -1;
+      currentCueIndex2 = -1;
+      currentRenderedCueKey = '';
+      if (currentAudioSourceType === 'audio') {
+        syncVideoPause();
+        syncVideoSeek(0);
+      }
+      updateDisplayedCaption(true);
+    }
+  });
+
+  el.addEventListener('ratechange', () => {
+    if ((el === audioEl && currentAudioSourceType === 'audio') || (el === localVideo && currentAudioSourceType === 'video')) {
+      currentRenderedCueKey = '';
+      updateDisplayedCaption(true);
+    }
+  });
 });
 
 document.getElementById('progressBar').addEventListener('click', e => {
   const activeEl = getActiveMediaElement();
-  if (!activeEl) return;
-  const duration = activeEl.duration || 0;
-  if (!duration) return;
+  if (!activeEl || !activeEl.duration) return;
   const rect = e.currentTarget.getBoundingClientRect();
   const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-  const newTime = ratio * duration;
+  const newTime = ratio * activeEl.duration;
   activeEl.currentTime = newTime;
-  curTimeEl.textContent = fmt(newTime);
-  progressFill.style.width = Math.round(ratio*100)+'%';
   pauseOffset = newTime;
-  if (currentAudioSourceType === 'audio') syncVideoSeek(newTime);
+  refreshProgressFromActiveMedia();
+  if (currentAudioSourceType === 'audio') {
+    syncVideoSeek(newTime);
+    if (activeEl.paused) syncVideoPause();
+  }
+  currentRenderedCueKey = '';
+  updateDisplayedCaption(true);
 });
 
 document.querySelectorAll('.mode-btn').forEach(btn => {

@@ -536,6 +536,13 @@ canvas { display: block; width: 100%; height: 100%; }
   grid-template-columns: minmax(0, 1fr);
 }
 
+
+.source-status {
+  flex-shrink: 0;
+  font: 11px 'Space Mono', monospace;
+  color: #c3cad5;
+  margin-top: -4px;
+}
 </style>
 </head>
 <body>
@@ -564,6 +571,7 @@ canvas { display: block; width: 100%; height: 100%; }
   <span class="track-name" id="trackName">—</span>
   <span class="track-dur" id="trackDur">0:00</span>
 </div>
+<div class="source-status" id="sourceStatus">Audio source: MP3 / audio file</div>
 
 <div class="mode-row">
   <button class="mode-btn active" data-mode="wave">WAVE</button>
@@ -720,6 +728,7 @@ const beatFlash = document.getElementById('beatFlash');
 const beatDots = document.querySelectorAll('.beat-dot');
 const noAudioMsg = document.getElementById('noAudioMsg');
 const trackInfo = document.getElementById('trackInfo');
+const sourceStatus = document.getElementById('sourceStatus');
 const uploadZone = document.getElementById('uploadZone');
 const captionToggleBtn = document.getElementById('captionToggleBtn');
 const subtitleLoadBtn = document.getElementById('subtitleLoadBtn');
@@ -815,6 +824,19 @@ function clearYouTubeVideo() {
   videoPlaceholder.hidden = false;
   setYouTubeStatus('');
   hideVideoPanel();
+  if (currentAudioSourceType === 'video') {
+    if (audioEl && audioEl.src) {
+      connectMediaElementForAnalysis(audioEl, 'audio');
+      updateTrackDisplay((document.getElementById('trackName').textContent || 'Audio file'), audioEl.duration || 0);
+      setSourceStatus('Audio source: MP3 / audio file');
+      syncPlayerStateFromMedia();
+    } else {
+      currentAudioSourceType = 'audio';
+      currentMediaElement = null;
+      playBtn.disabled = true;
+      noAudioMsg.style.display = '';
+    }
+  }
 }
 
 
@@ -828,7 +850,10 @@ function loadLocalVideoFile(file) {
   videoPlaceholder.hidden = true;
   showVideoPanel();
   setYouTubeStatus(`Local video loaded · ${file.name}`);
-  syncVideoToAudioState();
+  connectMediaElementForAnalysis(localVideo, 'video');
+  updateTrackDisplay(file.name.replace(/\.[^.]+$/, ''), localVideo.duration || 0);
+  setSourceStatus('Audio source: uploaded video');
+  syncPlayerStateFromMedia();
 }
 
 
@@ -886,6 +911,68 @@ function syncVideoToAudioState() {
   syncVideoSeek(current);
   if (playing) syncVideoPlay();
   else syncVideoPause();
+}
+
+
+function setSourceStatus(message) {
+  if (sourceStatus) sourceStatus.textContent = message || '';
+}
+
+function ensureAudioEngine() {
+  if (!audioCtx || audioCtx.state === 'closed') {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (!analyser) {
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 2048;
+    analyser.smoothingTimeConstant = 0.82;
+    analyser.connect(audioCtx.destination);
+  }
+}
+
+function connectMediaElementForAnalysis(mediaEl, typeLabel) {
+  ensureAudioEngine();
+  if (mediaSourceNode) {
+    try { mediaSourceNode.disconnect(); } catch(e) {}
+    mediaSourceNode = null;
+  }
+  try {
+    mediaSourceNode = audioCtx.createMediaElementSource(mediaEl);
+    mediaSourceNode.connect(analyser);
+    mediaSourceNode.connect(audioCtx.destination);
+  } catch (e) {
+    // createMediaElementSource can only be called once per element, so ignore if already connected
+  }
+  currentMediaElement = mediaEl;
+  currentAudioSourceType = typeLabel;
+  playBtn.disabled = false;
+  noAudioMsg.style.display = 'none';
+  cancelAnimationFrame(animFrame);
+  draw();
+}
+
+function getActiveMediaElement() {
+  if (currentAudioSourceType === 'video' && localVideo && localVideo.src) return localVideo;
+  if (audioEl && audioEl.src) return audioEl;
+  return null;
+}
+
+function updateTrackDisplay(name, durationSeconds) {
+  document.getElementById('trackName').textContent = name || '—';
+  document.getElementById('trackDur').textContent = fmt(durationSeconds || 0);
+  totTimeEl.textContent = fmt(durationSeconds || 0);
+  trackInfo.style.display = 'flex';
+}
+
+function syncPlayerStateFromMedia() {
+  const el = getActiveMediaElement();
+  if (!el || !audioCtx) return;
+  pauseOffset = el.currentTime || 0;
+  startTime = audioCtx.currentTime - pauseOffset;
+  playing = !el.paused && !el.ended;
+  playIcon.innerHTML = playing
+    ? '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>'
+    : '<path d="M8 5v14l11-7z"/>';
 }
 
 function fmt(s) {
@@ -949,51 +1036,26 @@ async function ensureAudioContext() {
 }
 
 async function loadFile(file) {
-  if (!file) return;
-  try {
-    await ensureAudioContext();
-    if (audioUrl) URL.revokeObjectURL(audioUrl);
-    audioUrl = URL.createObjectURL(file);
-    audioEl.pause();
-    audioEl.src = audioUrl;
-    audioEl.load();
+  ensureAudioEngine();
+  const objectUrl = URL.createObjectURL(file);
+  audioEl.src = objectUrl;
+  audioEl.load();
 
-    await new Promise((resolve, reject) => {
-      const onLoaded = () => { cleanup(); resolve(); };
-      const onError = () => { cleanup(); reject(new Error('Could not load audio file.')); };
-      const cleanup = () => {
-        audioEl.removeEventListener('loadedmetadata', onLoaded);
-        audioEl.removeEventListener('error', onError);
-      };
-      audioEl.addEventListener('loadedmetadata', onLoaded);
-      audioEl.addEventListener('error', onError);
-    });
+  await new Promise(resolve => {
+    if (audioEl.readyState >= 1) resolve();
+    else audioEl.addEventListener('loadedmetadata', resolve, { once: true });
+  });
 
-    if (mediaSource) {
-      try { mediaSource.disconnect(); } catch (e) {}
-    }
-    mediaSource = audioCtx.createMediaElementSource(audioEl);
-    mediaSource.connect(analyser);
-
-    document.getElementById('trackName').textContent = file.name.replace(/\.[^.]+$/, '');
-    document.getElementById('trackDur').textContent = fmt(audioEl.duration);
-    totTimeEl.textContent = fmt(audioEl.duration);
-    trackInfo.style.display = 'flex';
-    uploadZone.classList.add('collapsed');
-    document.querySelector('.upload-label').textContent = 'Load another audio file';
-    noAudioMsg.style.display = 'none';
-    playBtn.disabled = false;
-    captionToggleBtn.disabled = subtitleCues.length === 0;
-    beatHistory = [];
-    bpmEstimate = 0;
-    bpmNum.textContent = '—';
-    clearCaptions();
-    setCaptionStatus(subtitleCues.length ? 'audio loaded · subtitle file ready' : 'audio loaded · load a subtitle file');
-    resizeCanvas();
-    await startPlayback();
-  } catch (err) {
-    console.error(err);
-    setCaptionStatus('audio load failed');
+  connectMediaElementForAnalysis(audioEl, 'audio');
+  updateTrackDisplay(file.name.replace(/\.[^.]+$/, ''), audioEl.duration || 0);
+  setSourceStatus('Audio source: MP3 / audio file');
+  pauseOffset = 0;
+  beatHistory = []; bpmEstimate = 0;
+  bpmNum.textContent = '—';
+  currentRenderedCueKey = '';
+  playBtn.disabled = false;
+  if (audioCtx.state === 'suspended') {
+    try { await audioCtx.resume(); } catch(e) {}
   }
 }
 
@@ -1074,10 +1136,18 @@ audioEl.addEventListener('ended', () => {
 });
 
 document.getElementById('progressBar').addEventListener('click', e => {
-  if (!audioEl.src || !audioEl.duration) return;
+  const activeEl = getActiveMediaElement();
+  if (!activeEl) return;
+  const duration = activeEl.duration || 0;
+  if (!duration) return;
   const rect = e.currentTarget.getBoundingClientRect();
-  const ratio = clamp((e.clientX - rect.left) / rect.width, 0, 1);
-  audioEl.currentTime = ratio * audioEl.duration;
+  const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+  const newTime = ratio * duration;
+  activeEl.currentTime = newTime;
+  curTimeEl.textContent = fmt(newTime);
+  progressFill.style.width = Math.round(ratio*100)+'%';
+  pauseOffset = newTime;
+  if (currentAudioSourceType === 'audio') syncVideoSeek(newTime);
 });
 
 document.querySelectorAll('.mode-btn').forEach(btn => {
@@ -1770,6 +1840,44 @@ youtubeUrlInput.addEventListener('keydown', e => {
     e.preventDefault();
     loadYouTubeVideo();
   }
+});
+
+
+[audioEl, localVideo].forEach(el => {
+  if (!el) return;
+  el.addEventListener('play', () => {
+    if ((el === localVideo && currentAudioSourceType === 'video') || (el === audioEl && currentAudioSourceType === 'audio')) {
+      syncPlayerStateFromMedia();
+      cancelAnimationFrame(animFrame);
+      draw();
+    }
+  });
+  el.addEventListener('pause', () => {
+    if ((el === localVideo && currentAudioSourceType === 'video') || (el === audioEl && currentAudioSourceType === 'audio')) {
+      syncPlayerStateFromMedia();
+    }
+  });
+  el.addEventListener('ended', () => {
+    if ((el === localVideo && currentAudioSourceType === 'video') || (el === audioEl && currentAudioSourceType === 'audio')) {
+      syncPlayerStateFromMedia();
+      progressFill.style.width = '0%';
+      curTimeEl.textContent = '0:00';
+      if (currentAudioSourceType === 'audio') {
+        syncVideoPause();
+        syncVideoSeek(0);
+      }
+    }
+  });
+  el.addEventListener('loadedmetadata', () => {
+    if ((el === localVideo && currentAudioSourceType === 'video') || (el === audioEl && currentAudioSourceType === 'audio')) {
+      updateTrackDisplay(document.getElementById('trackName').textContent || '—', el.duration || 0);
+    }
+  });
+  el.addEventListener('timeupdate', () => {
+    if ((el === localVideo && currentAudioSourceType === 'video') || (el === audioEl && currentAudioSourceType === 'audio')) {
+      pauseOffset = el.currentTime || 0;
+    }
+  });
 });
 
 </script>

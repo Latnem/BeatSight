@@ -1,0 +1,1219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BeatSight</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body { height: 100%; }
+
+body {
+  font-family: 'Syne', sans-serif;
+  background: #2f3542;
+  color: #f0f0f0;
+  height: 100dvh;
+  padding: clamp(14px, 1.9vw, 22px);
+  display: flex;
+  flex-direction: column;
+  gap: clamp(10px, 1.2vh, 16px);
+  width: min(100%, 1200px);
+  margin: 0 auto;
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.pulse-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: #00e5a0;
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.6); opacity: 0.4; }
+}
+
+.title { font-size: 20px; font-weight: 800; letter-spacing: 0.04em; }
+.subtitle { display: none; }
+
+.upload-zone {
+  border: 1.5px dashed #4b5568;
+  border-radius: 16px;
+  padding: clamp(0.9rem, 1.9vh, 1.2rem);
+  flex-shrink: 0;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  position: relative;
+}
+.upload-zone:hover, .upload-zone.drag { border-color: #00e5a0; background: rgba(0,229,160,0.06); }
+.upload-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+.upload-icon { font-size: 24px; margin-bottom: 6px; }
+.upload-label { font-size: 14px; font-weight: 700; color: #f2f2f2; margin-bottom: 3px; }
+.upload-hint { font-size: 10px; color: #b7bfcc; font-family: 'Space Mono', monospace; }
+
+.upload-zone.collapsed {
+  padding: 10px 14px;
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.upload-zone.collapsed .upload-icon,
+.upload-zone.collapsed .upload-hint {
+  display: none;
+}
+.upload-zone.collapsed .upload-label {
+  margin-bottom: 0;
+  font-size: 12px;
+  color: #d9e0ea;
+}
+
+.track-info {
+  display: none;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  flex-shrink: 0;
+  background: rgba(255,255,255,0.08);
+  border-radius: 12px;
+}
+.track-icon { font-size: 18px; }
+.track-name { font-size: 14px; font-weight: 700; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.track-dur { font-size: 11px; color: #c3cad5; font-family: 'Space Mono', monospace; }
+
+.mode-row {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+.mode-btn {
+  font-size: 10px;
+  font-family: 'Space Mono', monospace;
+  padding: 5px 12px;
+  border-radius: 20px;
+  border: 0.5px solid #4b5568;
+  background: transparent;
+  color: #d2d8e2;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.mode-btn.active { border-color: #00e5a0; color: #00e5a0; background: rgba(0,229,160,0.10); }
+
+.viz-container {
+  background: rgba(255,255,255,0.06);
+  border-radius: 16px;
+  border: 0.5px solid #40495a;
+  overflow: hidden;
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+canvas { display: block; width: 100%; height: 100%; }
+.beat-flash {
+  position: absolute; inset: 0;
+  border-radius: 16px;
+  pointer-events: none;
+  opacity: 0;
+  border: 2px solid #00e5a0;
+  transition: opacity 0.07s;
+}
+.no-audio-msg {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; color: #b7bfcc;
+  font-family: 'Space Mono', monospace;
+  pointer-events: none;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.play-btn, .caption-btn {
+  height: 46px;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: transform 0.15s, background 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+.play-btn {
+  width: 46px;
+  background: #00e5a0;
+}
+.play-btn:hover, .caption-btn:hover { transform: scale(1.04); }
+.play-btn:active, .caption-btn:active { transform: scale(0.96); }
+.play-btn:disabled, .caption-btn:disabled { background: #414a5d; color: #c0c7d2; cursor: default; transform: none; }
+.play-btn svg { fill: #0a0a0f; }
+.play-btn:disabled svg { fill: #c0c7d2; }
+
+.caption-btn {
+  min-width: 116px;
+  padding: 0 16px;
+  background: rgba(255,255,255,0.08);
+  color: #f0f0f0;
+  border: 0.5px solid #4b5568;
+  font: 700 11px 'Space Mono', monospace;
+}
+.caption-btn.active {
+  background: rgba(0,229,160,0.12);
+  color: #00e5a0;
+  border-color: #00e5a0;
+}
+
+.progress-wrap { flex: 1; display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.time-row { display: flex; justify-content: space-between; font-size: 10px; color: #d2d8e2; font-family: 'Space Mono', monospace; }
+.progress-bar { height: 4px; background: #4b5568; border-radius: 2px; cursor: pointer; }
+.progress-fill { height: 100%; border-radius: 2px; background: linear-gradient(90deg, #00e5a0, #00b4ff); width: 0%; transition: width 0.1s linear; }
+
+.caption-panel {
+  flex-shrink: 0;
+  background: rgba(255,255,255,0.06);
+  border-radius: 14px;
+  border: 0.5px solid #40495a;
+  padding: 10px 12px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px 12px;
+  align-items: start;
+}
+.caption-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.caption-select {
+  height: 34px;
+  border-radius: 999px;
+  border: 0.5px solid #4b5568;
+  background: rgba(255,255,255,0.08);
+  color: #f0f0f0;
+  padding: 0 12px;
+  font: 11px 'Space Mono', monospace;
+  min-width: 118px;
+}
+.caption-status {
+  font: 11px 'Space Mono', monospace;
+  color: #b7bfcc;
+}
+.caption-display {
+  min-height: 74px;
+  background: rgba(0,0,0,0.16);
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.caption-line {
+  font-size: 14px;
+  line-height: 1.35;
+  color: #ffffff;
+  word-break: break-word;
+}
+.caption-line.secondary {
+  color: #cfd8e6;
+  font-size: 12px;
+}
+.caption-placeholder {
+  color: #9ca8ba;
+  font: 11px 'Space Mono', monospace;
+}
+.caption-badge {
+  display: inline-flex;
+  align-self: flex-start;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(0,229,160,0.12);
+  color: #00e5a0;
+  font: 10px 'Space Mono', monospace;
+}
+.caption-badge.off {
+  background: rgba(255,255,255,0.08);
+  color: #b7bfcc;
+}
+
+.metrics-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  flex-shrink: 0;
+}
+.metric-card {
+  background: rgba(255,255,255,0.06);
+  border-radius: 12px;
+  border: 0.5px solid #40495a;
+  padding: 10px;
+  text-align: center;
+  min-width: 0;
+}
+.metric-card.beat-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.bpm-num { font-size: 24px; font-weight: 800; color: #00e5a0; font-family: 'Space Mono', monospace; line-height: 1; margin-bottom: 4px; }
+.metric-label { font-size: 9px; color: #d2d8e2; font-family: 'Space Mono', monospace; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; }
+.beat-dots {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  justify-items: center;
+  margin-bottom: 8px;
+}
+.beat-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: #414a5d;
+  transition: background 0.06s, transform 0.06s;
+}
+.beat-dot.on { background: #00e5a0; transform: scale(1.35); }
+.meter-bar-wrap { height: 6px; background: #4b5568; border-radius: 3px; overflow: hidden; margin-bottom: 6px; }
+.meter-bar { height: 100%; border-radius: 3px; width: 0%; transition: width 0.05s; }
+.bass-bar { background: #ff4d6d; }
+.mid-bar  { background: #ffd166; }
+.high-bar { background: #00e5a0; }
+.meter-val { font-size: 16px; font-weight: 800; }
+.bass-val { color: #ff4d6d; }
+.mid-val  { color: #ffd166; }
+.high-val { color: #00e5a0; }
+
+.hidden-audio { display: none; }
+
+@media (max-width: 980px) {
+  body {
+    width: 100%;
+    padding: 12px;
+    gap: 10px;
+  }
+  .mode-row { gap: 6px; }
+  .mode-btn { flex: 1 1 auto; text-align: center; }
+  .caption-panel { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 700px) {
+  body { overflow: auto; height: auto; min-height: 100dvh; padding: 12px; }
+  .viz-container { min-height: 34vh; }
+  .metrics-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .controls { flex-wrap: wrap; }
+  .caption-btn { min-width: 100px; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="pulse-dot"></div>
+  <span class="title">BeatSight</span>
+  <span class="subtitle"></span>
+</div>
+
+<div class="upload-zone" id="uploadZone">
+  <input type="file" accept="audio/*" id="fileInput">
+  <div class="upload-icon">♪</div>
+  <div class="upload-label">Drop your audio file here</div>
+  <div class="upload-hint">click to browse · MP3 · WAV · OGG · M4A</div>
+</div>
+
+<div class="track-info" id="trackInfo">
+  <span class="track-icon">♫</span>
+  <span class="track-name" id="trackName">—</span>
+  <span class="track-dur" id="trackDur">0:00</span>
+</div>
+
+<div class="mode-row">
+  <button class="mode-btn active" data-mode="wave">WAVE</button>
+  <button class="mode-btn" data-mode="bars">BARS</button>
+  <button class="mode-btn" data-mode="radial">RADIAL</button>
+  <button class="mode-btn" data-mode="pulse">PULSE</button>
+  <button class="mode-btn" data-mode="mirror">MIRROR</button>
+  <button class="mode-btn" data-mode="rings">RINGS</button>
+  <button class="mode-btn" data-mode="grid">GRID</button>
+  <button class="mode-btn" data-mode="spectrum">SPECTRUM</button>
+  <button class="mode-btn" data-mode="scope">SCOPE</button>
+  <button class="mode-btn" data-mode="particles">PARTICLES</button>
+  <button class="mode-btn" data-mode="tunnel">TUNNEL</button>
+  <button class="mode-btn" data-mode="stereo">STEREO</button>
+</div>
+
+<div class="viz-container">
+  <canvas id="vizCanvas"></canvas>
+  <div class="beat-flash" id="beatFlash"></div>
+  <div class="no-audio-msg" id="noAudioMsg">load a track to begin</div>
+</div>
+
+<div class="controls">
+  <button class="play-btn" id="playBtn" disabled>
+    <svg id="playIcon" width="22" height="22" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+  </button>
+  <button class="caption-btn" id="captionToggleBtn" disabled>CAPTIONS OFF</button>
+  <div class="progress-wrap">
+    <div class="time-row">
+      <span id="curTime">0:00</span>
+      <span id="totTime">0:00</span>
+    </div>
+    <div class="progress-bar" id="progressBar">
+      <div class="progress-fill" id="progressFill"></div>
+    </div>
+  </div>
+</div>
+
+<div class="caption-panel">
+  <div class="caption-toolbar">
+    <select class="caption-select" id="captionLangSelect">
+      <option value="auto">AUTO LANGUAGE</option>
+      <option value="en-US">ENGLISH</option>
+      <option value="es-ES">SPANISH</option>
+      <option value="es-MX">SPANISH (MX)</option>
+    </select>
+    <span class="caption-status" id="captionStatus">captions ready when supported</span>
+  </div>
+  <div class="caption-display">
+    <span class="caption-badge off" id="captionModeBadge">OFF</span>
+    <div class="caption-line" id="captionEnglish"><span class="caption-placeholder">English captions will appear here</span></div>
+    <div class="caption-line secondary" id="captionOriginal"></div>
+  </div>
+</div>
+
+<div class="metrics-row">
+  <div class="metric-card beat-card">
+    <div class="metric-label">Beat Pulse</div>
+    <div class="bpm-num" id="bpmNum">—</div>
+    <div class="beat-dots" id="beatDots">
+      <div class="beat-dot"></div><div class="beat-dot"></div><div class="beat-dot"></div><div class="beat-dot"></div>
+      <div class="beat-dot"></div><div class="beat-dot"></div><div class="beat-dot"></div><div class="beat-dot"></div>
+    </div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-label">Bass</div>
+    <div class="meter-bar-wrap"><div class="meter-bar bass-bar" id="bassBar"></div></div>
+    <div class="meter-val bass-val" id="bassVal">0</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-label">Mid</div>
+    <div class="meter-bar-wrap"><div class="meter-bar mid-bar" id="midBar"></div></div>
+    <div class="meter-val mid-val" id="midVal">0</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-label">High</div>
+    <div class="meter-bar-wrap"><div class="meter-bar high-bar" id="highBar"></div></div>
+    <div class="meter-val high-val" id="highVal">0</div>
+  </div>
+</div>
+
+<audio id="audioEl" class="hidden-audio" crossorigin="anonymous"></audio>
+
+<script>
+let audioCtx, analyser, mediaSource, audioUrl = '';
+let playing = false, vizMode = 'wave';
+let beatHistory = [], lastBeatTime = 0, bpmEstimate = 0, beatDotIndex = 0;
+let lastBassLevel = 0, sparklePhase = 0;
+let recognition = null, captionsEnabled = false, recognitionRunning = false;
+let restartRecognitionTimer = null, detector = null, translatorCache = new Map(), audioTrack = null;
+
+const canvas = document.getElementById('vizCanvas');
+const ctx2 = canvas.getContext('2d');
+const audioEl = document.getElementById('audioEl');
+const playBtn = document.getElementById('playBtn');
+const playIcon = document.getElementById('playIcon');
+const progressFill = document.getElementById('progressFill');
+const curTimeEl = document.getElementById('curTime');
+const totTimeEl = document.getElementById('totTime');
+const bpmNum = document.getElementById('bpmNum');
+const beatFlash = document.getElementById('beatFlash');
+const beatDots = document.querySelectorAll('.beat-dot');
+const noAudioMsg = document.getElementById('noAudioMsg');
+const trackInfo = document.getElementById('trackInfo');
+const uploadZone = document.getElementById('uploadZone');
+const captionToggleBtn = document.getElementById('captionToggleBtn');
+const captionLangSelect = document.getElementById('captionLangSelect');
+const captionStatus = document.getElementById('captionStatus');
+const captionModeBadge = document.getElementById('captionModeBadge');
+const captionEnglish = document.getElementById('captionEnglish');
+const captionOriginal = document.getElementById('captionOriginal');
+
+function fmt(s) {
+  s = Math.max(0, Math.floor(s || 0));
+  return Math.floor(s/60) + ':' + String(s%60).padStart(2,'0');
+}
+function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+
+function resizeCanvas() {
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  const width = Math.max(1, Math.floor(rect.width));
+  const height = Math.max(1, Math.floor(rect.height));
+  canvas.width = width * dpr;
+  canvas.height = height * dpr;
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+function setCaptionStatus(text) {
+  captionStatus.textContent = text;
+}
+function setCaptionBadge(text, active = false) {
+  captionModeBadge.textContent = text;
+  captionModeBadge.classList.toggle('off', !active);
+}
+function clearCaptions() {
+  captionEnglish.innerHTML = '<span class="caption-placeholder">English captions will appear here</span>';
+  captionOriginal.textContent = '';
+  setCaptionBadge(captionsEnabled ? 'LISTENING' : 'OFF', captionsEnabled);
+}
+clearCaptions();
+
+function filterProfanity(text) {
+  if (!text) return '';
+  const patterns = [
+    /\bfuck(?:ing|ed|er|ers)?\b/gi,
+    /\bshit(?:ty|ting|ted|s)?\b/gi,
+    /\bbitch(?:es)?\b/gi,
+    /\basshole(?:s)?\b/gi,
+    /\bdamn\b/gi,
+    /\bmotherfucker(?:s)?\b/gi
+  ];
+  let out = text;
+  patterns.forEach(re => { out = out.replace(re, '[---]'); });
+  return out;
+}
+
+async function ensureAudioContext() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 2048;
+    analyser.smoothingTimeConstant = 0.82;
+    analyser.connect(audioCtx.destination);
+  }
+  if (audioCtx.state === 'suspended') {
+    try { await audioCtx.resume(); } catch (e) {}
+  }
+}
+
+async function loadFile(file) {
+  if (!file) return;
+  try {
+    await ensureAudioContext();
+    if (audioUrl) URL.revokeObjectURL(audioUrl);
+    audioUrl = URL.createObjectURL(file);
+    audioEl.pause();
+    audioEl.src = audioUrl;
+    audioEl.load();
+
+    await new Promise((resolve, reject) => {
+      const onLoaded = () => { cleanup(); resolve(); };
+      const onError = () => { cleanup(); reject(new Error('Could not load audio file.')); };
+      const cleanup = () => {
+        audioEl.removeEventListener('loadedmetadata', onLoaded);
+        audioEl.removeEventListener('error', onError);
+      };
+      audioEl.addEventListener('loadedmetadata', onLoaded);
+      audioEl.addEventListener('error', onError);
+    });
+
+    if (mediaSource) {
+      try { mediaSource.disconnect(); } catch (e) {}
+    }
+    mediaSource = audioCtx.createMediaElementSource(audioEl);
+    mediaSource.connect(analyser);
+
+    document.getElementById('trackName').textContent = file.name.replace(/\.[^.]+$/, '');
+    document.getElementById('trackDur').textContent = fmt(audioEl.duration);
+    totTimeEl.textContent = fmt(audioEl.duration);
+    trackInfo.style.display = 'flex';
+    uploadZone.classList.add('collapsed');
+    document.querySelector('.upload-label').textContent = 'Load another audio file';
+    noAudioMsg.style.display = 'none';
+    captionToggleBtn.disabled = false;
+    playBtn.disabled = false;
+    beatHistory = [];
+    bpmEstimate = 0;
+    bpmNum.textContent = '—';
+    clearCaptions();
+    setCaptionStatus('audio loaded');
+    resizeCanvas();
+    await startPlayback();
+  } catch (err) {
+    console.error(err);
+    setCaptionStatus('audio load failed');
+  }
+}
+
+document.getElementById('fileInput').addEventListener('change', e => {
+  if (e.target.files[0]) loadFile(e.target.files[0]);
+});
+
+uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag'));
+uploadZone.addEventListener('drop', e => {
+  e.preventDefault();
+  uploadZone.classList.remove('drag');
+  if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
+});
+
+async function startPlayback() {
+  if (!audioEl.src) return;
+  await ensureAudioContext();
+  try {
+    await audioEl.play();
+    playing = true;
+    playIcon.innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
+    cancelAnimationFrame(window._animFrame);
+    draw();
+    if (captionsEnabled) startCaptions();
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+function pausePlayback() {
+  audioEl.pause();
+  playing = false;
+  playIcon.innerHTML = '<path d="M8 5v14l11-7z"/>';
+  if (captionsEnabled) stopCaptions(false);
+}
+
+playBtn.addEventListener('click', async () => {
+  if (!audioEl.src) return;
+  if (playing) pausePlayback();
+  else await startPlayback();
+});
+
+audioEl.addEventListener('timeupdate', () => {
+  const p = audioEl.duration ? Math.min(audioEl.currentTime / audioEl.duration, 1) : 0;
+  progressFill.style.width = Math.round(p*100) + '%';
+  curTimeEl.textContent = fmt(audioEl.currentTime);
+});
+audioEl.addEventListener('ended', () => {
+  playing = false;
+  playIcon.innerHTML = '<path d="M8 5v14l11-7z"/>';
+  progressFill.style.width = '0%';
+  curTimeEl.textContent = '0:00';
+  stopCaptions(false);
+});
+
+document.getElementById('progressBar').addEventListener('click', e => {
+  if (!audioEl.src || !audioEl.duration) return;
+  const rect = e.currentTarget.getBoundingClientRect();
+  const ratio = clamp((e.clientX - rect.left) / rect.width, 0, 1);
+  audioEl.currentTime = ratio * audioEl.duration;
+});
+
+document.querySelectorAll('.mode-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    vizMode = btn.dataset.mode;
+  });
+});
+
+function getSpeechRecognitionCtor() {
+  return window.SpeechRecognition || window.webkitSpeechRecognition || null;
+}
+
+async function ensureDetector() {
+  if (detector || typeof LanguageDetector === 'undefined') return detector;
+  try {
+    detector = await LanguageDetector.create({ expectedInputLanguages: ['en', 'en-US', 'es', 'es-ES', 'es-MX'] });
+  } catch (e) {
+    detector = null;
+  }
+  return detector;
+}
+
+async function detectLanguage(text) {
+  const selected = captionLangSelect.value;
+  if (selected !== 'auto') return selected.toLowerCase();
+  try {
+    const det = await ensureDetector();
+    if (det && text) {
+      const result = await det.detect(text);
+      if (result && result[0] && result[0].detectedLanguage) return result[0].detectedLanguage.toLowerCase();
+    }
+  } catch (e) {}
+  return 'en';
+}
+
+async function getTranslator(sourceLanguage) {
+  const key = sourceLanguage + '->en';
+  if (translatorCache.has(key)) return translatorCache.get(key);
+  if (typeof Translator === 'undefined' || !window.isSecureContext) return null;
+  try {
+    if (typeof Translator.availability === 'function') {
+      const availability = await Translator.availability({ sourceLanguage, targetLanguage: 'en' });
+      if (availability === 'unavailable') return null;
+    }
+    const translator = await Translator.create({ sourceLanguage, targetLanguage: 'en' });
+    translatorCache.set(key, translator);
+    return translator;
+  } catch (e) {
+    return null;
+  }
+}
+
+async function translateToEnglish(text, detectedLanguage) {
+  const lang = (detectedLanguage || 'en').toLowerCase();
+  if (!text) return text;
+  if (lang.startsWith('en')) return text;
+  const translator = await getTranslator(lang);
+  if (!translator) return null;
+  try {
+    return await translator.translate(text);
+  } catch (e) {
+    return null;
+  }
+}
+
+function renderCaption(englishText, originalText, badgeText = 'CAPTIONS') {
+  const cleanEnglish = filterProfanity(englishText || '');
+  const cleanOriginal = filterProfanity(originalText || '');
+  captionEnglish.textContent = cleanEnglish || 'Listening…';
+  if (cleanOriginal && cleanOriginal.trim().toLowerCase() !== cleanEnglish.trim().toLowerCase()) {
+    captionOriginal.textContent = cleanOriginal;
+  } else {
+    captionOriginal.textContent = '';
+  }
+  setCaptionBadge(badgeText, true);
+}
+
+function scheduleRecognitionRestart() {
+  clearTimeout(restartRecognitionTimer);
+  if (!captionsEnabled || !playing) return;
+  restartRecognitionTimer = setTimeout(() => {
+    if (captionsEnabled && playing) startCaptions();
+  }, 280);
+}
+
+function stopCaptions(updateUi = true) {
+  clearTimeout(restartRecognitionTimer);
+  restartRecognitionTimer = null;
+  if (recognition) {
+    recognition.onresult = null;
+    recognition.onend = null;
+    recognition.onerror = null;
+    try { recognition.stop(); } catch (e) {}
+  }
+  recognition = null;
+  recognitionRunning = false;
+  audioTrack = null;
+  if (updateUi) {
+    captionToggleBtn.textContent = 'CAPTIONS OFF';
+    captionToggleBtn.classList.remove('active');
+    setCaptionBadge('OFF', false);
+    setCaptionStatus('captions off');
+  }
+}
+
+async function startCaptions() {
+  if (!captionsEnabled || !audioEl.src) return;
+  const SpeechRecognitionCtor = getSpeechRecognitionCtor();
+  if (!SpeechRecognitionCtor) {
+    setCaptionStatus('speech recognition not supported in this browser');
+    renderCaption('This browser does not support live captions here.', '', 'UNSUPPORTED');
+    return;
+  }
+  if (!playing) return;
+  if (recognitionRunning) return;
+
+  clearTimeout(restartRecognitionTimer);
+  recognition = new SpeechRecognitionCtor();
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  recognition.lang = captionLangSelect.value === 'auto' ? 'es-ES' : captionLangSelect.value;
+  recognition.maxAlternatives = 1;
+  if ('processLocally' in recognition) {
+    try { recognition.processLocally = false; } catch (e) {}
+  }
+
+  recognition.onresult = async (event) => {
+    let latestTranscript = '';
+    let isFinal = false;
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      const res = event.results[i];
+      latestTranscript += res[0].transcript + ' ';
+      if (res.isFinal) isFinal = true;
+    }
+    latestTranscript = latestTranscript.trim();
+    if (!latestTranscript) return;
+
+    const detectedLanguage = await detectLanguage(latestTranscript);
+    const translated = await translateToEnglish(latestTranscript, detectedLanguage);
+    const englishText = translated || latestTranscript;
+    const modeText = translated ? 'TRANSLATED' : (detectedLanguage.startsWith('en') ? 'ENGLISH' : 'ORIGINAL');
+    renderCaption(englishText, translated ? latestTranscript : '', modeText);
+    setCaptionStatus(
+      translated
+        ? 'live caption translated to English'
+        : detectedLanguage.startsWith('en')
+          ? 'live English captions'
+          : 'translation API unavailable, showing original'
+    );
+    if (isFinal) setCaptionBadge(modeText, true);
+  };
+
+  recognition.onerror = (event) => {
+    recognitionRunning = false;
+    const msg = event && event.error ? String(event.error) : 'caption error';
+    if (msg === 'not-allowed') {
+      setCaptionStatus('microphone or speech permission denied');
+      renderCaption('Speech permission is blocked. Allow it to use captions.', '', 'BLOCKED');
+      stopCaptions(false);
+      return;
+    }
+    if (msg === 'network') {
+      setCaptionStatus('speech service/network issue');
+    } else {
+      setCaptionStatus('caption error: ' + msg);
+    }
+    scheduleRecognitionRestart();
+  };
+
+  recognition.onend = () => {
+    recognitionRunning = false;
+    scheduleRecognitionRestart();
+  };
+
+  try {
+    if (audioEl.captureStream) {
+      const stream = audioEl.captureStream();
+      audioTrack = stream.getAudioTracks()[0];
+    } else if (audioEl.mozCaptureStream) {
+      const stream = audioEl.mozCaptureStream();
+      audioTrack = stream.getAudioTracks()[0];
+    } else {
+      audioTrack = null;
+    }
+
+    if (audioTrack && audioTrack.readyState === 'live') {
+      recognition.start(audioTrack);
+      setCaptionStatus('capturing song audio for captions');
+    } else {
+      recognition.start();
+      setCaptionStatus('using microphone for captions');
+    }
+    recognitionRunning = true;
+  } catch (e) {
+    recognitionRunning = false;
+    setCaptionStatus('could not start captions in this browser');
+    renderCaption('Captions could not start here. Try Chrome over HTTPS, or allow microphone access.', '', 'UNAVAILABLE');
+  }
+}
+
+captionToggleBtn.addEventListener('click', async () => {
+  if (!audioEl.src) return;
+  captionsEnabled = !captionsEnabled;
+  captionToggleBtn.classList.toggle('active', captionsEnabled);
+  captionToggleBtn.textContent = captionsEnabled ? 'CAPTIONS ON' : 'CAPTIONS OFF';
+  if (captionsEnabled) {
+    setCaptionBadge('LISTENING', true);
+    setCaptionStatus(window.isSecureContext
+      ? 'starting captions'
+      : 'captions may work, but translation needs HTTPS');
+    if (playing) await startCaptions();
+  } else {
+    stopCaptions();
+    clearCaptions();
+  }
+});
+
+captionLangSelect.addEventListener('change', async () => {
+  if (!captionsEnabled) return;
+  stopCaptions(false);
+  setCaptionStatus('caption language updated');
+  if (playing) await startCaptions();
+});
+
+function draw() {
+  window._animFrame = requestAnimationFrame(draw);
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.width / dpr;
+  const H = canvas.height / dpr;
+
+  if (!analyser) {
+    ctx2.save();
+    ctx2.scale(dpr, dpr);
+    ctx2.clearRect(0, 0, W, H);
+    ctx2.restore();
+    return;
+  }
+
+  const bufLen = analyser.frequencyBinCount;
+  const freqData = new Uint8Array(bufLen);
+  const timeData = new Uint8Array(analyser.fftSize);
+  analyser.getByteFrequencyData(freqData);
+  analyser.getByteTimeDomainData(timeData);
+
+  const bassEnd = Math.max(1, Math.floor(bufLen * 0.05));
+  const midEnd  = Math.max(bassEnd + 1, Math.floor(bufLen * 0.3));
+  let bSum = 0, mSum = 0, hSum = 0;
+  for (let i = 0; i < bassEnd; i++) bSum += freqData[i];
+  for (let i = bassEnd; i < midEnd; i++) mSum += freqData[i];
+  for (let i = midEnd; i < bufLen; i++) hSum += freqData[i];
+
+  const bassLvl = Math.round(bSum / bassEnd);
+  const midLvl  = Math.round(mSum / Math.max(1, midEnd - bassEnd));
+  const highLvl = Math.round(hSum / Math.max(1, bufLen - midEnd));
+  const avgLvl = Math.round((bassLvl + midLvl + highLvl) / 3);
+
+  document.getElementById('bassBar').style.width = Math.round(bassLvl / 2.55) + '%';
+  document.getElementById('midBar').style.width  = Math.round(midLvl / 2.55) + '%';
+  document.getElementById('highBar').style.width = Math.round(highLvl / 2.55) + '%';
+  document.getElementById('bassVal').textContent = bassLvl;
+  document.getElementById('midVal').textContent  = midLvl;
+  document.getElementById('highVal').textContent = highLvl;
+
+  if (bassLvl > 110 && bassLvl > lastBassLevel * 1.12) {
+    const now = performance.now();
+    if (now - lastBeatTime > 220) {
+      if (lastBeatTime > 0) {
+        beatHistory.push(now - lastBeatTime);
+        if (beatHistory.length > 12) beatHistory.shift();
+        const avg = beatHistory.reduce((a,b) => a + b, 0) / beatHistory.length;
+        bpmEstimate = Math.round(60000 / avg);
+        bpmNum.textContent = bpmEstimate;
+      }
+      lastBeatTime = now;
+      beatFlash.style.opacity = '1';
+      setTimeout(() => beatFlash.style.opacity = '0', 90);
+      const di = beatDotIndex % 8;
+      beatDots[di].classList.add('on');
+      setTimeout(() => beatDots[di].classList.remove('on'), 220);
+      beatDotIndex++;
+    }
+  }
+  lastBassLevel = bassLvl;
+
+  ctx2.save();
+  ctx2.scale(dpr, dpr);
+  ctx2.clearRect(0, 0, W, H);
+
+  if (vizMode === 'wave') drawWave(timeData, W, H, bassLvl);
+  else if (vizMode === 'bars') drawBars(freqData, W, H);
+  else if (vizMode === 'radial') drawRadial(freqData, timeData, W, H, bassLvl);
+  else if (vizMode === 'pulse') drawPulse(W, H, bassLvl, midLvl, highLvl);
+  else if (vizMode === 'mirror') drawMirror(freqData, W, H, bassLvl, highLvl);
+  else if (vizMode === 'rings') drawRings(freqData, W, H, bassLvl, midLvl, highLvl);
+  else if (vizMode === 'grid') drawGrid(freqData, W, H, bassLvl, avgLvl);
+  else if (vizMode === 'spectrum') drawSpectrum(freqData, W, H, bassLvl, midLvl, highLvl);
+  else if (vizMode === 'scope') drawScope(timeData, W, H, bassLvl, midLvl, highLvl);
+  else if (vizMode === 'particles') drawParticles(freqData, W, H, bassLvl, avgLvl);
+  else if (vizMode === 'tunnel') drawTunnel(freqData, W, H, bassLvl, midLvl, highLvl);
+  else if (vizMode === 'stereo') drawStereo(freqData, W, H, bassLvl, midLvl, highLvl);
+
+  ctx2.restore();
+}
+draw();
+
+function drawBackground(W, H, alpha = 0.22) {
+  const grad = ctx2.createLinearGradient(0, 0, W, H);
+  grad.addColorStop(0, `rgba(0,229,160,${alpha})`);
+  grad.addColorStop(0.5, 'rgba(0,180,255,0.06)');
+  grad.addColorStop(1, 'rgba(255,77,109,0.10)');
+  ctx2.fillStyle = grad;
+  ctx2.fillRect(0, 0, W, H);
+}
+function drawWave(timeData, W, H, bassLvl) {
+  drawBackground(W, H, 0.14);
+  const boost = bassLvl / 255;
+  const layers = [
+    { color:'#00e5a0', alpha:1.0, yOff:0 },
+    { color:'#00b4ff', alpha:0.3, yOff:5*boost },
+    { color:'#ff4d6d', alpha:0.15, yOff:-5*boost }
+  ];
+  layers.forEach(l => {
+    ctx2.globalAlpha = l.alpha;
+    ctx2.strokeStyle = l.color;
+    ctx2.lineWidth = 2.2;
+    ctx2.beginPath();
+    const sliceW = W / timeData.length;
+    for (let i=0; i<timeData.length; i++) {
+      const v = (timeData[i]/128.0)-1;
+      const x = i*sliceW;
+      const y = H/2 + v*H/2*(0.85+boost*0.45) + l.yOff;
+      if (i===0) ctx2.moveTo(x,y); else ctx2.lineTo(x,y);
+    }
+    ctx2.stroke();
+  });
+  ctx2.globalAlpha = 0.08;
+  ctx2.strokeStyle = '#00e5a0';
+  ctx2.lineWidth = 0.5;
+  ctx2.beginPath(); ctx2.moveTo(0,H/2); ctx2.lineTo(W,H/2); ctx2.stroke();
+  ctx2.globalAlpha = 1;
+}
+function drawBars(freqData, W, H) {
+  drawBackground(W, H, 0.12);
+  const barCount = 80;
+  const slot = W / barCount;
+  const barW = slot * 0.72;
+  const gap = slot * 0.28;
+  for (let i=0; i<barCount; i++) {
+    const idx = Math.floor(i/barCount*freqData.length*0.65);
+    const v = freqData[idx]/255;
+    const barH = v*H*0.95;
+    const x = i*(barW+gap);
+    const t = i/barCount;
+    const r = t<0.35 ? 255 : Math.round(255*(1-(t-0.35)/0.65));
+    const g = t<0.2 ? Math.round(t*5*229) : t<0.7 ? 229 : Math.round(229*(1-(t-0.7)/0.3));
+    const b = t<0.5 ? Math.round(160*(1-t*2)) : Math.round((t-0.5)*2*200);
+    ctx2.globalAlpha = 0.8 + v*0.2;
+    ctx2.fillStyle = `rgb(${Math.min(255,r)},${Math.min(255,g)},${Math.min(255,b)})`;
+    const rad = Math.min(barW/2, 3);
+    ctx2.beginPath();
+    ctx2.roundRect(x, H-barH, barW, barH, [rad,rad,0,0]);
+    ctx2.fill();
+  }
+  ctx2.globalAlpha = 1;
+}
+function drawRadial(freqData, timeData, W, H, bassLvl) {
+  drawBackground(W, H, 0.10);
+  const cx=W/2, cy=H/2;
+  const baseR = Math.min(W,H)*0.22;
+  const boost = bassLvl/255;
+  ctx2.globalAlpha = 0.1+boost*0.1;
+  ctx2.strokeStyle = '#00e5a0'; ctx2.lineWidth = 1;
+  ctx2.beginPath(); ctx2.arc(cx,cy,baseR+boost*12,0,Math.PI*2); ctx2.stroke();
+  ctx2.globalAlpha = 1;
+  for (let i=0; i<90; i++) {
+    const idx = Math.floor(i/90*freqData.length*0.7);
+    const v = freqData[idx]/255;
+    const angle = (i/90)*Math.PI*2 - Math.PI/2;
+    const r1=baseR, r2=baseR+v*baseR*1.2;
+    const t=i/90;
+    const red = t<0.5 ? Math.round(255*t*2) : 255;
+    const grn = t<0.33 ? Math.round(229*t*3) : t<0.66 ? 229 : Math.round(229*(1-(t-0.66)*3));
+    const blu = t<0.5 ? Math.round(160-t*300) : Math.round((t-0.5)*2*200);
+    ctx2.strokeStyle = `rgba(${clamp(red,0,255)},${clamp(grn,0,255)},${clamp(blu,0,255)},${0.5+v*0.5})`;
+    ctx2.lineWidth = 2;
+    ctx2.beginPath();
+    ctx2.moveTo(cx+Math.cos(angle)*r1, cy+Math.sin(angle)*r1);
+    ctx2.lineTo(cx+Math.cos(angle)*r2, cy+Math.sin(angle)*r2);
+    ctx2.stroke();
+  }
+  ctx2.strokeStyle = 'rgba(0,229,160,0.7)'; ctx2.lineWidth = 1.5;
+  ctx2.beginPath();
+  for (let i=0; i<=360; i++) {
+    const j=Math.floor(i/360*timeData.length);
+    const v=(timeData[j]/128.0-1)*0.4;
+    const angle=(i/360)*Math.PI*2 - Math.PI/2;
+    const r=baseR+v*baseR*(1+boost);
+    const x=cx+Math.cos(angle)*r, y=cy+Math.sin(angle)*r;
+    if(i===0) ctx2.moveTo(x,y); else ctx2.lineTo(x,y);
+  }
+  ctx2.closePath(); ctx2.stroke();
+  ctx2.fillStyle='#00e5a0';
+  ctx2.font=`bold ${Math.round(11+boost*5)}px Space Mono,monospace`;
+  ctx2.textAlign='center'; ctx2.textBaseline='middle';
+  ctx2.globalAlpha=0.4+boost*0.6;
+  ctx2.fillText(bpmEstimate>0 ? bpmEstimate+' BPM' : '♫', cx, cy);
+  ctx2.globalAlpha=1;
+}
+function drawPulse(W, H, bassLvl, midLvl, highLvl) {
+  drawBackground(W, H, 0.18);
+  const cx = W / 2;
+  const cy = H / 2;
+  const bassScale = bassLvl / 255;
+  const midScale = midLvl / 255;
+  const highScale = highLvl / 255;
+  const radii = [30 + bassScale * 60, 55 + midScale * 70, 85 + highScale * 80];
+  const colors = ['#ff4d6d', '#ffd166', '#00e5a0'];
+  radii.forEach((r, i) => {
+    ctx2.globalAlpha = 0.18 + i * 0.08;
+    ctx2.fillStyle = colors[i];
+    ctx2.beginPath(); ctx2.arc(cx, cy, r, 0, Math.PI * 2); ctx2.fill();
+  });
+  ctx2.globalAlpha = 1;
+  ctx2.fillStyle = '#f4f7fb';
+  ctx2.font = '700 15px Space Mono, monospace';
+  ctx2.textAlign = 'center'; ctx2.textBaseline = 'middle';
+  ctx2.fillText('PULSE', cx, cy);
+}
+function drawMirror(freqData, W, H, bassLvl, highLvl) {
+  drawBackground(W, H, 0.14);
+  const half = Math.floor(freqData.length * 0.45);
+  const step = W / half;
+  const centerY = H / 2;
+  ctx2.strokeStyle = '#00e5a0'; ctx2.lineWidth = 1; ctx2.globalAlpha = 0.12;
+  ctx2.beginPath(); ctx2.moveTo(0, centerY); ctx2.lineTo(W, centerY); ctx2.stroke();
+  ctx2.globalAlpha = 1;
+  for (let i = 0; i < half; i += 3) {
+    const v = freqData[i] / 255;
+    const x = i * step;
+    const topH = v * (H * 0.42) * (1 + bassLvl / 255 * 0.4);
+    const bottomH = v * (H * 0.30) * (1 + highLvl / 255 * 0.5);
+    ctx2.strokeStyle = i % 2 === 0 ? '#00b4ff' : '#00e5a0';
+    ctx2.lineWidth = 2;
+    ctx2.beginPath(); ctx2.moveTo(x, centerY - 2); ctx2.lineTo(x, centerY - topH); ctx2.stroke();
+    ctx2.strokeStyle = i % 2 === 0 ? '#ff4d6d' : '#ffd166';
+    ctx2.beginPath(); ctx2.moveTo(x, centerY + 2); ctx2.lineTo(x, centerY + bottomH); ctx2.stroke();
+  }
+}
+function drawRings(freqData, W, H, bassLvl, midLvl, highLvl) {
+  drawBackground(W, H, 0.10);
+  const cx = W / 2, cy = H / 2;
+  [bassLvl, midLvl, highLvl].forEach((lvl, idx) => {
+    const base = 35 + idx * 28;
+    const amp = lvl / 255;
+    const colors = ['#ff4d6d', '#ffd166', '#00e5a0'];
+    ctx2.strokeStyle = colors[idx]; ctx2.lineWidth = 2.5; ctx2.globalAlpha = 0.8;
+    ctx2.beginPath();
+    for (let i = 0; i <= 120; i++) {
+      const p = i / 120;
+      const angle = p * Math.PI * 2 - Math.PI / 2;
+      const sample = freqData[Math.floor(p * freqData.length * 0.55)] / 255;
+      const radius = base + sample * 30 + amp * 24;
+      const x = cx + Math.cos(angle) * radius;
+      const y = cy + Math.sin(angle) * radius;
+      if (i === 0) ctx2.moveTo(x, y); else ctx2.lineTo(x, y);
+    }
+    ctx2.closePath(); ctx2.stroke();
+  });
+  ctx2.globalAlpha = 1;
+}
+function drawGrid(freqData, W, H, bassLvl, avgLvl) {
+  drawBackground(W, H, 0.16);
+  const cols = 12, rows = 6, gap = 8;
+  const cellW = (W - gap * (cols + 1)) / cols;
+  const cellH = (H - gap * (rows + 1)) / rows;
+  const glow = bassLvl / 255;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const idx = Math.floor(((r * cols + c) / (rows * cols)) * freqData.length * 0.7);
+      const v = freqData[idx] / 255;
+      const x = gap + c * (cellW + gap);
+      const y = gap + r * (cellH + gap);
+      const hueMix = (c / cols);
+      const red = Math.round(255 * (1 - hueMix) * v);
+      const green = Math.round(140 + 90 * v);
+      const blue = Math.round(255 * hueMix * v + 100);
+      ctx2.fillStyle = `rgba(${red},${green},${blue},${0.18 + v * 0.75})`;
+      ctx2.beginPath();
+      ctx2.roundRect(x, y, cellW, cellH * (0.45 + v * 0.7), 6);
+      ctx2.fill();
+    }
+  }
+  ctx2.strokeStyle = `rgba(255,255,255,${0.08 + glow * 0.12})`;
+  ctx2.lineWidth = 1; ctx2.strokeRect(0.5, 0.5, W - 1, H - 1);
+  ctx2.fillStyle = '#f4f7fb'; ctx2.globalAlpha = 0.75;
+  ctx2.font = '700 12px Space Mono, monospace'; ctx2.fillText('LEVEL ' + avgLvl, 16, H - 16);
+  ctx2.globalAlpha = 1;
+}
+function drawSpectrum(freqData, W, H, bassLvl, midLvl, highLvl) {
+  drawBackground(W, H, 0.12);
+  const barCount = 56, baseY = H * 0.88, slot = W / barCount, barW = Math.max(3, slot * 0.62);
+  for (let i = 0; i < barCount; i++) {
+    const sample = freqData[Math.floor((i / barCount) * freqData.length * 0.82)] / 255;
+    const eased = Math.pow(sample, 0.85);
+    const barH = eased * H * 0.72;
+    const x = i * slot + (slot - barW) / 2;
+    const grad = ctx2.createLinearGradient(0, baseY - barH, 0, baseY);
+    grad.addColorStop(0, 'rgba(255,77,109,0.95)');
+    grad.addColorStop(0.5, 'rgba(255,209,102,0.95)');
+    grad.addColorStop(1, 'rgba(0,229,160,0.95)');
+    ctx2.fillStyle = grad;
+    ctx2.beginPath(); ctx2.roundRect(x, baseY - barH, barW, barH, [4,4,0,0]); ctx2.fill();
+  }
+  const peak = Math.max(bassLvl, midLvl, highLvl);
+  ctx2.fillStyle = 'rgba(244,247,251,0.85)';
+  ctx2.font = '700 12px Space Mono, monospace'; ctx2.fillText('SPECTRUM ' + peak, 16, 18);
+}
+function drawScope(timeData, W, H, bassLvl, midLvl, highLvl) {
+  drawBackground(W, H, 0.08);
+  const lines = [
+    { color: '#00e5a0', alpha: 1, amp: 0.42 + bassLvl / 255 * 0.2, offset: 0 },
+    { color: '#00b4ff', alpha: 0.55, amp: 0.28 + midLvl / 255 * 0.16, offset: -H * 0.18 },
+    { color: '#ff4d6d', alpha: 0.35, amp: 0.22 + highLvl / 255 * 0.16, offset: H * 0.18 }
+  ];
+  lines.forEach(line => {
+    ctx2.strokeStyle = line.color; ctx2.globalAlpha = line.alpha; ctx2.lineWidth = 2; ctx2.beginPath();
+    for (let i = 0; i < timeData.length; i++) {
+      const x = (i / (timeData.length - 1)) * W;
+      const v = (timeData[i] - 128) / 128;
+      const y = H / 2 + line.offset + v * (H * line.amp);
+      if (i === 0) ctx2.moveTo(x, y); else ctx2.lineTo(x, y);
+    }
+    ctx2.stroke();
+  });
+  ctx2.globalAlpha = 0.12; ctx2.strokeStyle = '#f4f7fb';
+  for (let i = 1; i < 4; i++) { const y = (H / 4) * i; ctx2.beginPath(); ctx2.moveTo(0, y); ctx2.lineTo(W, y); ctx2.stroke(); }
+  ctx2.globalAlpha = 1;
+}
+function drawParticles(freqData, W, H, bassLvl, avgLvl) {
+  drawBackground(W, H, 0.10);
+  const cx = W / 2, cy = H / 2; sparklePhase += 0.02 + avgLvl / 255 * 0.03;
+  const count = 120;
+  for (let i = 0; i < count; i++) {
+    const t = i / count;
+    const idx = Math.floor(t * freqData.length * 0.7);
+    const energy = freqData[idx] / 255;
+    const angle = t * Math.PI * 2 + sparklePhase;
+    const radius = 18 + energy * Math.min(W, H) * 0.42 + (i % 9) * 2;
+    const x = cx + Math.cos(angle) * radius;
+    const y = cy + Math.sin(angle) * radius * 0.7;
+    const size = 1.2 + energy * 5 + (bassLvl / 255) * 2;
+    ctx2.globalAlpha = 0.18 + energy * 0.75;
+    ctx2.fillStyle = i % 3 === 0 ? '#00e5a0' : (i % 3 === 1 ? '#00b4ff' : '#ffd166');
+    ctx2.beginPath(); ctx2.arc(x, y, size, 0, Math.PI * 2); ctx2.fill();
+  }
+  ctx2.globalAlpha = 1; ctx2.fillStyle = '#f4f7fb'; ctx2.font = '700 13px Space Mono, monospace';
+  ctx2.textAlign = 'center'; ctx2.fillText('PARTICLES', cx, cy); ctx2.textAlign = 'left';
+}
+function drawTunnel(freqData, W, H, bassLvl, midLvl, highLvl) {
+  drawBackground(W, H, 0.09);
+  const cx = W / 2, cy = H / 2, rings = 18, maxR = Math.min(W, H) * 0.56;
+  for (let i = rings; i >= 1; i--) {
+    const t = i / rings;
+    const idx = Math.floor(t * freqData.length * 0.72);
+    const energy = freqData[idx] / 255;
+    const r = maxR * t * (0.42 + energy * 0.65);
+    ctx2.strokeStyle = i % 3 === 0 ? 'rgba(0,229,160,0.85)' : (i % 3 === 1 ? 'rgba(0,180,255,0.75)' : 'rgba(255,77,109,0.72)');
+    ctx2.lineWidth = 1 + energy * 3;
+    ctx2.beginPath(); ctx2.ellipse(cx, cy, r, r * (0.55 + midLvl / 255 * 0.2), 0, 0, Math.PI * 2); ctx2.stroke();
+  }
+  const flare = (bassLvl + highLvl) / 510;
+  ctx2.globalAlpha = 0.2 + flare * 0.35; ctx2.fillStyle = '#f4f7fb';
+  ctx2.fillRect(cx - 1, 0, 2, H); ctx2.fillRect(0, cy - 1, W, 2); ctx2.globalAlpha = 1;
+}
+function drawStereo(freqData, W, H, bassLvl, midLvl, highLvl) {
+  drawBackground(W, H, 0.14);
+  const centerGap = Math.max(12, W * 0.02);
+  const leftWidth = (W - centerGap) / 2;
+  const rightX = leftWidth + centerGap;
+  const bars = 22;
+  for (let i = 0; i < bars; i++) {
+    const idxL = Math.floor((i / bars) * freqData.length * 0.35);
+    const idxR = Math.floor((0.35 + i / bars * 0.35) * freqData.length);
+    const vL = freqData[idxL] / 255;
+    const vR = freqData[idxR] / 255;
+    const y = H - ((i + 1) / bars) * H * 0.92;
+    const h = H / bars * 0.68;
+    ctx2.fillStyle = 'rgba(0,229,160,' + (0.18 + vL * 0.72) + ')';
+    ctx2.beginPath(); ctx2.roundRect(leftWidth - vL * leftWidth, y, vL * leftWidth, h, 5); ctx2.fill();
+    ctx2.fillStyle = 'rgba(0,180,255,' + (0.18 + vR * 0.72) + ')';
+    ctx2.beginPath(); ctx2.roundRect(rightX, y, vR * leftWidth, h, 5); ctx2.fill();
+  }
+  ctx2.strokeStyle = 'rgba(255,255,255,0.12)';
+  ctx2.beginPath(); ctx2.moveTo(leftWidth + centerGap / 2, 0); ctx2.lineTo(leftWidth + centerGap / 2, H); ctx2.stroke();
+  ctx2.fillStyle = '#f4f7fb'; ctx2.font = '700 12px Space Mono, monospace';
+  ctx2.fillText('L', 14, 18); ctx2.fillText('R', W - 24, 18);
+}
+</script>
+</body>
+</html>

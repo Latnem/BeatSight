@@ -795,6 +795,7 @@ function showVideoPanel() {
 function hideVideoPanel() {
   videoPanel.hidden = true;
   mediaStage.classList.add('video-hidden');
+  videoPlaceholder.hidden = false;
 }
 function loadYouTubeVideo() {
   const raw = youtubeUrlInput.value.trim();
@@ -803,16 +804,19 @@ function loadYouTubeVideo() {
     setYouTubeStatus('Could not read that YouTube link.');
     return;
   }
+
   localVideo.pause();
   localVideo.removeAttribute('src');
   localVideo.load();
   localVideo.hidden = true;
-  youtubeFrame.src = `https://www.youtube.com/embed/${videoId}?enablejsapi=1&playsinline=1&rel=0&modestbranding=1`;
-  youtubeFrame.hidden = false;
+
   videoPlaceholder.hidden = true;
   showVideoPanel();
+
+  youtubeFrame.hidden = true;
+  youtubeFrame.src = `https://www.youtube.com/embed/${videoId}?enablejsapi=1&playsinline=1&autoplay=0&rel=0&modestbranding=1`;
+
   setYouTubeStatus('Video loaded. Some YouTube videos may block embedding.');
-  setTimeout(() => syncVideoToAudioState(), 500);
 }
 function clearYouTubeVideo() {
   youtubeFrame.src = '';
@@ -1829,6 +1833,16 @@ settingsBackdrop.addEventListener('click', closeSettings);
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && !settingsModal.hidden) closeSettings();
 });
+
+youtubeFrame.addEventListener('load', () => {
+  if (youtubeFrame.src) {
+    youtubeFrame.hidden = false;
+    videoPlaceholder.hidden = true;
+    setTimeout(() => syncVideoToAudioState(), 900);
+    setTimeout(() => syncVideoToAudioState(), 1700);
+  }
+});
+
 youtubeLoadBtn.addEventListener('click', loadYouTubeVideo);
 videoUploadBtn.addEventListener('click', () => videoFileInput.click());
 videoFileInput.addEventListener('change', e => {

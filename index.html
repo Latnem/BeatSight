@@ -531,6 +531,11 @@ canvas { display: block; width: 100%; height: 100%; }
   }
 }
 
+
+.media-stage.video-hidden {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 </style>
 </head>
 <body>
@@ -575,19 +580,20 @@ canvas { display: block; width: 100%; height: 100%; }
   <button class="mode-btn" data-mode="stereo">STEREO</button>
 </div>
 
-<div class="media-stage">
+<div class="media-stage video-hidden">
   <div class="viz-container">
     <canvas id="vizCanvas"></canvas>
     <div class="beat-flash" id="beatFlash"></div>
     <div class="no-audio-msg" id="noAudioMsg">load a track to begin</div>
   </div>
 
-  <div class="video-panel" id="videoPanel">
+  <div class="video-panel" id="videoPanel" hidden>
     <div class="video-placeholder" id="videoPlaceholder">
-      <div class="video-placeholder-title">YouTube video</div>
-      <div class="video-placeholder-text">Add a YouTube link in Settings to show video here beside the visualizer.</div>
+      <div class="video-placeholder-title">Video</div>
+      <div class="video-placeholder-text">Add a YouTube link in Settings</div>
     </div>
     <iframe id="youtubeFrame" class="youtube-frame" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen hidden></iframe>
+    <video id="localVideo" class="youtube-frame" controls playsinline hidden></video>
   </div>
 </div>
 
@@ -678,9 +684,11 @@ canvas { display: block; width: 100%; height: 100%; }
     <div class="settings-section-title">YouTube video</div>
     <div class="settings-row settings-row-stack">
       <input class="youtube-input" id="youtubeUrlInput" type="text" placeholder="Paste YouTube link here">
-      <div class="settings-row">
+      <div class="settings-row settings-row-wrap">
         <button class="caption-btn secondary" id="youtubeLoadBtn">SHOW VIDEO</button>
+        <button class="caption-btn secondary" id="videoUploadBtn">UPLOAD VIDEO</button>
         <button class="caption-btn secondary" id="youtubeClearBtn">CLEAR VIDEO</button>
+        <input type="file" id="videoFileInput" accept="video/*" hidden>
       </div>
       <div class="youtube-status" id="youtubeStatus"></div>
     </div>
@@ -735,6 +743,11 @@ const youtubeClearBtn = document.getElementById('youtubeClearBtn');
 const youtubeStatus = document.getElementById('youtubeStatus');
 const youtubeFrame = document.getElementById('youtubeFrame');
 const videoPlaceholder = document.getElementById('videoPlaceholder');
+const videoPanel = document.getElementById('videoPanel');
+const mediaStage = document.querySelector('.media-stage');
+const localVideo = document.getElementById('localVideo');
+const videoUploadBtn = document.getElementById('videoUploadBtn');
+const videoFileInput = document.getElementById('videoFileInput');
 
 
 function openSettings() {
@@ -766,6 +779,14 @@ function extractYouTubeId(input) {
   }
   return '';
 }
+function showVideoPanel() {
+  videoPanel.hidden = false;
+  mediaStage.classList.remove('video-hidden');
+}
+function hideVideoPanel() {
+  videoPanel.hidden = true;
+  mediaStage.classList.add('video-hidden');
+}
 function loadYouTubeVideo() {
   const raw = youtubeUrlInput.value.trim();
   const videoId = extractYouTubeId(raw);
@@ -773,16 +794,98 @@ function loadYouTubeVideo() {
     setYouTubeStatus('Could not read that YouTube link.');
     return;
   }
-  youtubeFrame.src = `https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1`;
+  localVideo.pause();
+  localVideo.removeAttribute('src');
+  localVideo.load();
+  localVideo.hidden = true;
+  youtubeFrame.src = `https://www.youtube.com/embed/${videoId}?enablejsapi=1&playsinline=1&rel=0&modestbranding=1`;
   youtubeFrame.hidden = false;
   videoPlaceholder.hidden = true;
+  showVideoPanel();
   setYouTubeStatus('Video loaded. Some YouTube videos may block embedding.');
+  setTimeout(() => syncVideoToAudioState(), 500);
 }
 function clearYouTubeVideo() {
   youtubeFrame.src = '';
   youtubeFrame.hidden = true;
+  localVideo.pause();
+  localVideo.removeAttribute('src');
+  localVideo.load();
+  localVideo.hidden = true;
   videoPlaceholder.hidden = false;
   setYouTubeStatus('');
+  hideVideoPanel();
+}
+
+
+function loadLocalVideoFile(file) {
+  if (!file) return;
+  const objectUrl = URL.createObjectURL(file);
+  youtubeFrame.src = '';
+  youtubeFrame.hidden = true;
+  localVideo.src = objectUrl;
+  localVideo.hidden = false;
+  videoPlaceholder.hidden = true;
+  showVideoPanel();
+  setYouTubeStatus(`Local video loaded · ${file.name}`);
+  syncVideoToAudioState();
+}
+
+
+function syncVideoPlay() {
+  try {
+    if (!youtubeFrame.hidden && youtubeFrame.src) {
+      youtubeFrame.contentWindow?.postMessage(JSON.stringify({
+        event: 'command',
+        func: 'playVideo',
+        args: []
+      }), '*');
+    }
+    if (!localVideo.hidden && localVideo.src) {
+      const playPromise = localVideo.play();
+      if (playPromise && typeof playPromise.catch === 'function') playPromise.catch(() => {});
+    }
+  } catch (e) {}
+}
+
+function syncVideoPause() {
+  try {
+    if (!youtubeFrame.hidden && youtubeFrame.src) {
+      youtubeFrame.contentWindow?.postMessage(JSON.stringify({
+        event: 'command',
+        func: 'pauseVideo',
+        args: []
+      }), '*');
+    }
+    if (!localVideo.hidden && localVideo.src) {
+      localVideo.pause();
+    }
+  } catch (e) {}
+}
+
+function syncVideoSeek(timeInSeconds) {
+  try {
+    const t = Math.max(0, Number(timeInSeconds) || 0);
+    if (!youtubeFrame.hidden && youtubeFrame.src) {
+      youtubeFrame.contentWindow?.postMessage(JSON.stringify({
+        event: 'command',
+        func: 'seekTo',
+        args: [t, true]
+      }), '*');
+    }
+    if (!localVideo.hidden && localVideo.src) {
+      if (Math.abs((localVideo.currentTime || 0) - t) > 0.2) {
+        localVideo.currentTime = t;
+      }
+    }
+  } catch (e) {}
+}
+
+function syncVideoToAudioState() {
+  const current = playing ? (audioCtx.currentTime - startTime) : pauseOffset;
+  syncVideoSeek(current);
+  if (playing) syncVideoPlay();
+  else syncVideoPause();
 }
 
 function fmt(s) {
@@ -1657,6 +1760,10 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && !settingsModal.hidden) closeSettings();
 });
 youtubeLoadBtn.addEventListener('click', loadYouTubeVideo);
+videoUploadBtn.addEventListener('click', () => videoFileInput.click());
+videoFileInput.addEventListener('change', e => {
+  if (e.target.files && e.target.files[0]) loadLocalVideoFile(e.target.files[0]);
+});
 youtubeClearBtn.addEventListener('click', clearYouTubeVideo);
 youtubeUrlInput.addEventListener('keydown', e => {
   if (e.key === 'Enter') {

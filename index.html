@@ -859,6 +859,8 @@ function loadLocalVideoFile(file) {
     connectMediaElementForAnalysis(localVideo, 'video');
     updateTrackDisplay(file.name.replace(/\.[^.]+$/, ''), localVideo.duration || 0);
     setSourceStatus('Audio source: uploaded video');
+    playBtn.disabled = false;
+    playBtn.removeAttribute('disabled');
     syncPlayerStateFromMedia();
     setYouTubeStatus(`Local video loaded · ${file.name}`);
   };
@@ -943,26 +945,32 @@ function ensureAudioEngine() {
 
 function connectMediaElementForAnalysis(mediaEl, typeLabel) {
   ensureAudioEngine();
-  if (mediaSourceNode) {
-    try { mediaSourceNode.disconnect(); } catch(e) {}
-    mediaSourceNode = null;
-  }
-  try {
-    mediaSourceNode = audioCtx.createMediaElementSource(mediaEl);
-    mediaSourceNode.connect(analyser);
-    mediaSourceNode.connect(audioCtx.destination);
-  } catch (e) {
-    // createMediaElementSource can only be called once per element, so ignore if already connected
-  }
   currentMediaElement = mediaEl;
   currentAudioSourceType = typeLabel;
+
+  if (!mediaEl._beatsightSourceNode) {
+    try {
+      mediaEl._beatsightSourceNode = audioCtx.createMediaElementSource(mediaEl);
+      mediaEl._beatsightSourceNode.connect(analyser);
+      mediaEl._beatsightSourceNode.connect(audioCtx.destination);
+    } catch (e) {
+      console.warn('Media source connect warning:', e);
+    }
+  }
+
   playBtn.disabled = false;
+  playBtn.removeAttribute('disabled');
+  playBtn.removeAttribute('disabled');
   noAudioMsg.style.display = 'none';
   cancelAnimationFrame(animFrame);
   draw();
 }
 
 function getActiveMediaElement() {
+  if (currentMediaElement) {
+    if (currentMediaElement === localVideo && localVideo && localVideo.src) return localVideo;
+    if (currentMediaElement === audioEl && audioEl && audioEl.src) return audioEl;
+  }
   if (currentAudioSourceType === 'video' && localVideo && localVideo.src) return localVideo;
   if (audioEl && audioEl.src) return audioEl;
   return null;
@@ -1114,9 +1122,25 @@ function pausePlayback() {
 
 playBtn.addEventListener('click', async () => {
   const activeEl = getActiveMediaElement();
-  if (!activeEl) return;
-  if (activeEl.paused || activeEl.ended) await startPlayback();
-  else pausePlayback();
+  if (!activeEl) {
+    console.warn('No active media element found.');
+    return;
+  }
+  playBtn.disabled = false;
+  playBtn.removeAttribute('disabled');
+  ensureAudioEngine();
+  if (audioCtx && audioCtx.state === 'suspended') {
+    try { await audioCtx.resume(); } catch (e) { console.warn(e); }
+  }
+  try {
+    if (activeEl.paused || activeEl.ended) {
+      await startPlayback();
+    } else {
+      pausePlayback();
+    }
+  } catch (e) {
+    console.error('Play button failed:', e);
+  }
 });
 
 function refreshProgressFromActiveMedia() {

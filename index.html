@@ -820,9 +820,11 @@ function loadYouTubeVideo() {
   showVideoPanel();
 
   youtubeFrame.hidden = true;
-  youtubeFrame.src = `https://www.youtube.com/embed/${videoId}?enablejsapi=1&playsinline=1&autoplay=0&rel=0&modestbranding=1`;
+  youtubeFrame.src = `https://www.youtube.com/embed/${videoId}?enablejsapi=1&playsinline=1&autoplay=0&mute=1&controls=1&rel=0&modestbranding=1`;
 
   setYouTubeStatus('Video loaded. Some YouTube videos may block embedding.');
+  setTimeout(muteYouTubeVideo, 150);
+  setTimeout(muteYouTubeVideo, 800);
 }
 function clearYouTubeVideo() {
   youtubeFrame.src = '';
@@ -877,14 +879,34 @@ function loadLocalVideoFile(file) {
 }
 
 
+
+function muteYouTubeVideo() {
+  try {
+    if (!youtubeFrame.hidden && youtubeFrame.src) {
+      youtubeFrame.contentWindow?.postMessage(JSON.stringify({
+        event: 'command',
+        func: 'mute',
+        args: []
+      }), '*');
+      youtubeFrame.contentWindow?.postMessage(JSON.stringify({
+        event: 'command',
+        func: 'setVolume',
+        args: [0]
+      }), '*');
+    }
+  } catch (e) {}
+}
+
 function syncVideoPlay() {
   try {
     if (!youtubeFrame.hidden && youtubeFrame.src) {
+      muteYouTubeVideo();
       youtubeFrame.contentWindow?.postMessage(JSON.stringify({
         event: 'command',
         func: 'playVideo',
         args: []
       }), '*');
+      muteYouTubeVideo();
     }
     if (!localVideo.hidden && localVideo.src) {
       const playPromise = localVideo.play();
@@ -912,11 +934,13 @@ function syncVideoSeek(timeInSeconds) {
   try {
     const t = Math.max(0, Number(timeInSeconds) || 0);
     if (!youtubeFrame.hidden && youtubeFrame.src) {
+      muteYouTubeVideo();
       youtubeFrame.contentWindow?.postMessage(JSON.stringify({
         event: 'command',
         func: 'seekTo',
         args: [t, true]
       }), '*');
+      muteYouTubeVideo();
     }
     if (!localVideo.hidden && localVideo.src) {
       if (Math.abs((localVideo.currentTime || 0) - t) > 0.2) {
@@ -1962,6 +1986,15 @@ youtubeFrame.addEventListener('load', () => {
   }
 });
 
+youtubeFrame.addEventListener('load', () => {
+  if (youtubeFrame.src) {
+    youtubeFrame.hidden = false;
+    if (videoPlaceholder) videoPlaceholder.style.display = 'none';
+    muteYouTubeVideo();
+    setTimeout(muteYouTubeVideo, 400);
+    setTimeout(muteYouTubeVideo, 1200);
+  }
+});
 youtubeLoadBtn.addEventListener('click', loadYouTubeVideo);
 videoUploadBtn.addEventListener('click', () => videoFileInput.click());
 videoFileInput.addEventListener('change', e => {

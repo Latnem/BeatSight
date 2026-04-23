@@ -584,9 +584,9 @@ canvas { display: block; width: 100%; height: 100%; }
   <button class="mode-btn" data-mode="scope">SCOPE</button>
   <button class="mode-btn" data-mode="mirror">MIRROR</button>
   <button class="mode-btn" data-mode="stereo">STEREO</button>
-  <button class="mode-btn" data-mode="loudness">LOUDNESS</button>
-  <button class="mode-btn" data-mode="peak">PEAK</button>
-  <button class="mode-btn" data-mode="level">LEVEL</button>
+  <button class="mode-btn" data-mode="freq">FREQ</button>
+  <button class="mode-btn" data-mode="stack">STACK</button>
+  <button class="mode-btn" data-mode="line">LINE</button>
 </div>
 
 <div class="media-stage video-hidden">
@@ -1627,15 +1627,14 @@ function draw() {
   if (vizMode === 'wave') drawWave(timeData, W, H, bassLvl);
   else if (vizMode === 'bars') drawBars(freqData, W, H);
   else if (vizMode === 'radial') drawRadial(freqData, timeData, W, H, bassLvl);
-  else if (vizMode === 'pulse') drawPulse(W, H, bassLvl, midLvl, highLvl);
   else if (vizMode === 'mirror') drawMirror(freqData, W, H, bassLvl, highLvl);
-  else if (vizMode === 'rings') drawRings(freqData, W, H, bassLvl, midLvl, highLvl);
-  else if (vizMode === 'grid') drawGrid(freqData, W, H, bassLvl, avgLvl);
   else if (vizMode === 'spectrum') drawSpectrum(freqData, W, H, bassLvl, midLvl, highLvl);
   else if (vizMode === 'scope') drawScope(timeData, W, H, bassLvl, midLvl, highLvl);
-  else if (vizMode === 'particles') drawParticles(freqData, W, H, bassLvl, avgLvl);
-  else if (vizMode === 'tunnel') drawTunnel(freqData, W, H, bassLvl, midLvl, highLvl);
   else if (vizMode === 'stereo') drawStereo(freqData, W, H, bassLvl, midLvl, highLvl);
+  else if (vizMode === 'freq') drawFreqBars(freqData, W, H);
+  else if (vizMode === 'stack') drawStack(freqData, W, H);
+  else if (vizMode === 'line') drawLineSpectrum(freqData, W, H);
+  else drawWave(timeData, W, H, bassLvl);
 
   ctx2.restore();
 }
@@ -2147,6 +2146,149 @@ function drawLevelSteps(freqData, W, H, bassLvl, midLvl, highLvl) {
   ctx2.font = 'bold 12px Space Mono, monospace';
   ctx2.textAlign = 'center';
   ctx2.fillText('LOUDNESS STEPS', W / 2, H - 12);
+}
+
+
+function drawFreqBars(freqData, W, H) {
+  const groups = 24;
+  const usable = Math.floor(freqData.length * 0.72);
+  const groupSize = Math.max(1, Math.floor(usable / groups));
+  const slot = W / groups;
+  const barW = Math.max(4, slot * 0.68);
+
+  for (let i = 0; i < groups; i++) {
+    let sum = 0;
+    const start = i * groupSize;
+    const end = Math.min(usable, start + groupSize);
+    for (let j = start; j < end; j++) sum += freqData[j];
+    const avg = sum / Math.max(1, end - start);
+    const v = avg / 255;
+    const barH = Math.max(4, v * (H - 26));
+    const x = i * slot + (slot - barW) / 2;
+    const y = H - barH - 8;
+
+    const t = i / (groups - 1);
+    ctx2.fillStyle = t < 0.45 ? '#00e5a0' : t < 0.78 ? '#ffd166' : '#ff4d6d';
+    ctx2.beginPath();
+    ctx2.roundRect(x, y, barW, barH, 6);
+    ctx2.fill();
+  }
+
+  ctx2.strokeStyle = 'rgba(255,255,255,0.08)';
+  ctx2.beginPath();
+  ctx2.moveTo(0, H - 8);
+  ctx2.lineTo(W, H - 8);
+  ctx2.stroke();
+}
+
+function drawCenterWave(timeData, W, H, bassLvl, midLvl, highLvl) {
+  const amp = 0.75 + (bassLvl + midLvl + highLvl) / (255 * 3) * 0.9;
+  const layers = [
+    { color: '#00e5a0', width: 3.2, scale: 0.90 },
+    { color: '#00b4ff', width: 2.1, scale: 0.62 },
+    { color: '#ffd166', width: 1.6, scale: 0.42 }
+  ];
+
+  layers.forEach(layer => {
+    ctx2.strokeStyle = layer.color;
+    ctx2.lineWidth = layer.width;
+    ctx2.beginPath();
+    const slice = W / timeData.length;
+    for (let i = 0; i < timeData.length; i++) {
+      const v = (timeData[i] / 128) - 1;
+      const x = i * slice;
+      const y = H / 2 + v * (H * 0.36) * amp * layer.scale;
+      if (i === 0) ctx2.moveTo(x, y);
+      else ctx2.lineTo(x, y);
+    }
+    ctx2.stroke();
+  });
+
+  ctx2.strokeStyle = 'rgba(255,255,255,0.10)';
+  ctx2.lineWidth = 1;
+  ctx2.beginPath();
+  ctx2.moveTo(0, H / 2);
+  ctx2.lineTo(W, H / 2);
+  ctx2.stroke();
+}
+
+function drawBandPulse(freqData, W, H, bassLvl, midLvl, highLvl) {
+  const bands = [
+    { label: 'LOW', value: bassLvl, color: '#00e5a0' },
+    { label: 'MID', value: midLvl, color: '#ffd166' },
+    { label: 'HIGH', value: highLvl, color: '#ff4d6d' }
+  ];
+  const gap = 18;
+  const cardW = (W - gap * 4) / 3;
+  const baseY = 22;
+  const maxH = H - 56;
+
+  bands.forEach((band, i) => {
+    const x = gap + i * (cardW + gap);
+    const norm = band.value / 255;
+    const h = Math.max(8, maxH * norm);
+
+    ctx2.fillStyle = 'rgba(255,255,255,0.05)';
+    ctx2.beginPath();
+    ctx2.roundRect(x, baseY, cardW, maxH, 16);
+    ctx2.fill();
+
+    ctx2.fillStyle = band.color;
+    ctx2.beginPath();
+    ctx2.roundRect(x + 8, baseY + maxH - h - 8, cardW - 16, h, 12);
+    ctx2.fill();
+
+    ctx2.fillStyle = '#f0f0f0';
+    ctx2.font = 'bold 12px Space Mono, monospace';
+    ctx2.textAlign = 'center';
+    ctx2.fillText(band.label, x + cardW / 2, H - 12);
+  });
+}
+
+
+function drawStack(freqData, W, H) {
+  const bands = 30;
+  const slice = Math.floor(freqData.length / bands);
+  const barW = W / bands;
+
+  for (let i = 0; i < bands; i++) {
+    let sum = 0;
+    for (let j = i * slice; j < (i + 1) * slice; j++) sum += freqData[j];
+    const avg = sum / slice;
+    const h = (avg / 255) * H * 0.9;
+
+    ctx2.fillStyle = 'rgba(255,255,255,0.08)';
+    ctx2.fillRect(i * barW, H - h, barW - 2, h);
+
+    ctx2.fillStyle = '#00e5a0';
+    ctx2.fillRect(i * barW, H - h, barW - 2, h * 0.5);
+
+    ctx2.fillStyle = '#ffd166';
+    ctx2.fillRect(i * barW, H - h * 0.5, barW - 2, h * 0.25);
+
+    ctx2.fillStyle = '#ff4d6d';
+    ctx2.fillRect(i * barW, H - h * 0.25, barW - 2, h * 0.25);
+  }
+}
+
+function drawLineSpectrum(freqData, W, H) {
+  const len = freqData.length * 0.7;
+  const step = W / len;
+
+  ctx2.strokeStyle = '#00e5a0';
+  ctx2.lineWidth = 2;
+  ctx2.beginPath();
+
+  for (let i = 0; i < len; i++) {
+    const v = freqData[i] / 255;
+    const x = i * step;
+    const y = H - v * H * 0.8;
+
+    if (i === 0) ctx2.moveTo(x, y);
+    else ctx2.lineTo(x, y);
+  }
+
+  ctx2.stroke();
 }
 
 </script>

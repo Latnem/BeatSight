@@ -543,6 +543,7 @@ canvas { display: block; width: 100%; height: 100%; }
   color: #c3cad5;
   margin-top: -4px;
 }
+.video-placeholder-text:empty { display: none; }
 </style>
 </head>
 <body>
@@ -598,7 +599,7 @@ canvas { display: block; width: 100%; height: 100%; }
   <div class="video-panel" id="videoPanel" hidden>
     <div class="video-placeholder" id="videoPlaceholder">
       <div class="video-placeholder-title">Video</div>
-      <div class="video-placeholder-text">Add a YouTube link in Settings</div>
+      <div class="video-placeholder-text"></div>
     </div>
     <iframe id="youtubeFrame" class="youtube-frame" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen hidden></iframe>
     <video id="localVideo" class="youtube-frame" controls playsinline hidden></video>
@@ -752,12 +753,15 @@ const youtubeClearBtn = document.getElementById('youtubeClearBtn');
 const youtubeStatus = document.getElementById('youtubeStatus');
 const youtubeFrame = document.getElementById('youtubeFrame');
 const videoPlaceholder = document.getElementById('videoPlaceholder');
+const videoPlaceholderTextEl = document.querySelector('.video-placeholder-text');
 const videoPanel = document.getElementById('videoPanel');
 const mediaStage = document.querySelector('.media-stage');
 const localVideo = document.getElementById('localVideo');
 const videoUploadBtn = document.getElementById('videoUploadBtn');
 const videoFileInput = document.getElementById('videoFileInput');
 
+
+if (videoPlaceholderTextEl) videoPlaceholderTextEl.textContent = '';
 
 function openSettings() {
   settingsModal.hidden = false;
@@ -795,7 +799,7 @@ function showVideoPanel() {
 function hideVideoPanel() {
   videoPanel.hidden = true;
   mediaStage.classList.add('video-hidden');
-  videoPlaceholder.hidden = false;
+  videoPlaceholder.hidden = true;
 }
 function loadYouTubeVideo() {
   const raw = youtubeUrlInput.value.trim();
@@ -825,7 +829,7 @@ function clearYouTubeVideo() {
   localVideo.removeAttribute('src');
   localVideo.load();
   localVideo.hidden = true;
-  videoPlaceholder.hidden = false;
+  videoPlaceholder.hidden = true;
   setYouTubeStatus('');
   hideVideoPanel();
   if (currentAudioSourceType === 'video') {

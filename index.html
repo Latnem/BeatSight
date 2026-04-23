@@ -126,6 +126,30 @@ canvas {
   border: 2px solid #00e5a0;
   transition: opacity 0.07s;
 }
+
+.video-zoom-controls {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  gap: 6px;
+  z-index: 10;
+}
+.video-zoom-controls button {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: none;
+  background: rgba(0,0,0,0.60);
+  color: #ffffff;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+.video-zoom-controls button:hover {
+  background: rgba(0,0,0,0.82);
+}
+
 .youtube-frame {
   width: 100%;
   height: 100%;
@@ -287,6 +311,10 @@ canvas {
   </div>
 
   <div class="video-panel">
+    <div class="video-zoom-controls">
+      <button id="zoomOut" aria-label="Zoom out video">−</button>
+      <button id="zoomIn" aria-label="Zoom in video">+</button>
+    </div>
     <iframe
       id="youtubeFrame"
       class="youtube-frame"
@@ -370,6 +398,9 @@ const midVal = document.getElementById('midVal');
 const highVal = document.getElementById('highVal');
 const progressBar = document.getElementById('progressBar');
 const youtubeFrame = document.getElementById('youtubeFrame');
+const zoomInBtn = document.getElementById('zoomIn');
+const zoomOutBtn = document.getElementById('zoomOut');
+let videoScale = 1;
 
 function fmt(s) {
   s = Math.max(0, Math.floor(Number(s) || 0));
@@ -446,6 +477,22 @@ function seekYouTubeVideo(t) {
   }), '*');
   muteYouTubeVideo();
 }
+
+
+function applyVideoZoom() {
+  youtubeFrame.style.transform = `scale(${videoScale})`;
+  youtubeFrame.style.transformOrigin = 'center center';
+}
+
+zoomInBtn.addEventListener('click', () => {
+  videoScale = Math.min(2.5, videoScale + 0.2);
+  applyVideoZoom();
+});
+
+zoomOutBtn.addEventListener('click', () => {
+  videoScale = Math.max(0.6, videoScale - 0.2);
+  applyVideoZoom();
+});
 
 youtubeFrame.addEventListener('load', () => {
   muteYouTubeVideo();

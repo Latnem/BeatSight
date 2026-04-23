@@ -1,0 +1,2329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BeatSight</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body { height: 100%; }
+
+body {
+  font-family: 'Syne', sans-serif;
+  background: #2f3542;
+  color: #f0f0f0;
+  height: 100dvh;
+  padding: clamp(14px, 1.9vw, 22px);
+  display: flex;
+  flex-direction: column;
+  gap: clamp(10px, 1.2vh, 16px);
+  width: min(100%, 1200px);
+  margin: 0 auto;
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.pulse-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: #00e5a0;
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.6); opacity: 0.4; }
+}
+
+.title { font-size: 20px; font-weight: 800; letter-spacing: 0.04em; }
+.subtitle { display: none; }
+
+.upload-zone {
+  border: 1.5px dashed #4b5568;
+  border-radius: 16px;
+  padding: clamp(0.9rem, 1.9vh, 1.2rem);
+  flex-shrink: 0;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  position: relative;
+}
+.upload-zone:hover, .upload-zone.drag { border-color: #00e5a0; background: rgba(0,229,160,0.06); }
+.upload-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+.upload-icon { font-size: 24px; margin-bottom: 6px; }
+.upload-label { font-size: 14px; font-weight: 700; color: #f2f2f2; margin-bottom: 3px; }
+.upload-hint { font-size: 10px; color: #b7bfcc; font-family: 'Space Mono', monospace; }
+
+.upload-zone.collapsed {
+  padding: 10px 14px;
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.upload-zone.collapsed .upload-icon,
+.upload-zone.collapsed .upload-hint {
+  display: none;
+}
+.upload-zone.collapsed .upload-label {
+  margin-bottom: 0;
+  font-size: 12px;
+  color: #d9e0ea;
+}
+
+.track-info {
+  display: none;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  flex-shrink: 0;
+  background: rgba(255,255,255,0.08);
+  border-radius: 12px;
+}
+.track-icon { font-size: 18px; }
+.track-name { font-size: 14px; font-weight: 700; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.track-dur { font-size: 11px; color: #c3cad5; font-family: 'Space Mono', monospace; }
+
+.mode-row {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+.mode-btn {
+  font-size: 10px;
+  font-family: 'Space Mono', monospace;
+  padding: 5px 12px;
+  border-radius: 20px;
+  border: 0.5px solid #4b5568;
+  background: transparent;
+  color: #d2d8e2;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.mode-btn.active { border-color: #00e5a0; color: #00e5a0; background: rgba(0,229,160,0.10); }
+
+.viz-container {
+  background: rgba(255,255,255,0.06);
+  border-radius: 16px;
+  border: 0.5px solid #40495a;
+  overflow: hidden;
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+canvas { display: block; width: 100%; height: 100%; }
+.beat-flash {
+  position: absolute; inset: 0;
+  border-radius: 16px;
+  pointer-events: none;
+  opacity: 0;
+  border: 2px solid #00e5a0;
+  transition: opacity 0.07s;
+}
+.no-audio-msg {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; color: #b7bfcc;
+  font-family: 'Space Mono', monospace;
+  pointer-events: none;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.play-btn, .caption-btn {
+  height: 46px;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: transform 0.15s, background 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+.play-btn {
+  width: 46px;
+  background: #00e5a0;
+}
+.play-btn:hover, .caption-btn:hover { transform: scale(1.04); }
+.play-btn:active, .caption-btn:active { transform: scale(0.96); }
+.play-btn:disabled, .caption-btn:disabled { background: #414a5d; color: #c0c7d2; cursor: default; transform: none; }
+.play-btn svg { fill: #0a0a0f; }
+.play-btn:disabled svg { fill: #c0c7d2; }
+
+.caption-btn {
+  min-width: 116px;
+  padding: 0 16px;
+  background: rgba(255,255,255,0.08);
+  color: #f0f0f0;
+  border: 0.5px solid #4b5568;
+  font: 700 11px 'Space Mono', monospace;
+}
+.caption-btn.active {
+  background: rgba(0,229,160,0.12);
+  color: #00e5a0;
+  border-color: #00e5a0;
+}
+
+.progress-wrap { flex: 1; display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.time-row { display: flex; justify-content: space-between; font-size: 10px; color: #d2d8e2; font-family: 'Space Mono', monospace; }
+.progress-bar { height: 4px; background: #4b5568; border-radius: 2px; cursor: pointer; }
+.progress-fill { height: 100%; border-radius: 2px; background: linear-gradient(90deg, #00e5a0, #00b4ff); width: 0%; transition: width 0.1s linear; }
+
+.caption-panel {
+  flex-shrink: 0;
+  background: rgba(255,255,255,0.06);
+  border-radius: 14px;
+  border: 0.5px solid #40495a;
+  padding: 10px 12px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px 12px;
+  align-items: start;
+}
+.caption-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.caption-select {
+  height: 34px;
+  border-radius: 999px;
+  border: 0.5px solid #4b5568;
+  background: rgba(255,255,255,0.08);
+  color: #f0f0f0;
+  padding: 0 12px;
+  font: 11px 'Space Mono', monospace;
+  min-width: 118px;
+}
+.caption-status {
+  font: 11px 'Space Mono', monospace;
+  color: #b7bfcc;
+}
+.dual-toggle {
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 0.5px solid #4b5568;
+  background: rgba(255,255,255,0.08);
+  color: #f0f0f0;
+  font: 11px 'Space Mono', monospace;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.dual-toggle.active {
+  border-color: #00e5a0;
+  color: #00e5a0;
+  background: rgba(0,229,160,0.10);
+}
+.caption-display {
+  min-height: 74px;
+  background: rgba(0,0,0,0.16);
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.caption-line {
+  font-size: 14px;
+  line-height: 1.35;
+  color: #ffffff;
+  word-break: break-word;
+}
+.caption-line.secondary {
+  color: #cfd8e6;
+  font-size: 12px;
+}
+.caption-placeholder {
+  color: #9ca8ba;
+  font: 11px 'Space Mono', monospace;
+}
+.caption-badge {
+  display: inline-flex;
+  align-self: flex-start;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(0,229,160,0.12);
+  color: #00e5a0;
+  font: 10px 'Space Mono', monospace;
+}
+.caption-badge.off {
+  background: rgba(255,255,255,0.08);
+  color: #b7bfcc;
+}
+
+.metrics-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  flex-shrink: 0;
+}
+.metric-card {
+  background: rgba(255,255,255,0.06);
+  border-radius: 12px;
+  border: 0.5px solid #40495a;
+  padding: 10px;
+  text-align: center;
+  min-width: 0;
+}
+.metric-card.beat-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.bpm-num { font-size: 24px; font-weight: 800; color: #00e5a0; font-family: 'Space Mono', monospace; line-height: 1; margin-bottom: 4px; }
+.metric-label { font-size: 9px; color: #d2d8e2; font-family: 'Space Mono', monospace; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; }
+.beat-dots {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  justify-items: center;
+  margin-bottom: 8px;
+}
+.beat-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: #414a5d;
+  transition: background 0.06s, transform 0.06s;
+}
+.beat-dot.on { background: #00e5a0; transform: scale(1.35); }
+.meter-bar-wrap { height: 6px; background: #4b5568; border-radius: 3px; overflow: hidden; margin-bottom: 6px; }
+.meter-bar { height: 100%; border-radius: 3px; width: 0%; transition: width 0.05s; }
+.bass-bar { background: #ff4d6d; }
+.mid-bar  { background: #ffd166; }
+.high-bar { background: #00e5a0; }
+.meter-val { font-size: 16px; font-weight: 800; }
+.bass-val { color: #ff4d6d; }
+.mid-val  { color: #ffd166; }
+.high-val { color: #00e5a0; }
+
+.hidden-audio { display: none; }
+
+@media (max-width: 980px) {
+  body {
+    width: 100%;
+    padding: 12px;
+    gap: 10px;
+  }
+  .mode-row { gap: 6px; }
+  .mode-btn { flex: 1 1 auto; text-align: center; }
+  .caption-panel { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 700px) {
+  body { overflow: auto; height: auto; min-height: 100dvh; padding: 12px; }
+  .viz-container { min-height: 34vh; }
+  .metrics-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .controls { flex-wrap: wrap; }
+  .caption-btn { min-width: 100px; }
+}
+
+.lang-pills {
+  display: inline-flex;
+  gap: 6px;
+  padding: 3px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.10);
+  border: 0.5px solid #4b5568;
+}
+
+.lang-pill {
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: none;
+  background: transparent;
+  color: #f0f0f0;
+  font: 11px 'Space Mono', monospace;
+  cursor: pointer;
+}
+
+.lang-pill.active {
+  background: #ffffff;
+  color: #000000;
+}
+
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.header .title { flex: 1; }
+.icon-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  border: 0.5px solid #4b5568;
+  background: rgba(255,255,255,0.08);
+  color: #f0f0f0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.icon-btn:hover {
+  background: rgba(255,255,255,0.14);
+  transform: scale(1.03);
+}
+.media-stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
+  gap: 12px;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.video-panel {
+  position: relative;
+  min-height: 0;
+  background: rgba(255,255,255,0.06);
+  border-radius: 16px;
+  border: 0.5px solid #40495a;
+  overflow: hidden;
+}
+.video-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  text-align: center;
+  color: #d9e0ea;
+}
+.video-placeholder-title {
+  font: 700 15px 'Syne', sans-serif;
+  margin-bottom: 6px;
+}
+.video-placeholder-text {
+  font: 11px 'Space Mono', monospace;
+  color: #b7bfcc;
+  max-width: 34ch;
+}
+.youtube-frame {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+  background: #111827;
+}
+.settings-modal {
+  position: fixed;
+  top: 76px;
+  right: max(18px, calc((100vw - min(100vw, 1200px)) / 2 + 18px));
+  width: min(560px, calc(100vw - 36px));
+  max-height: calc(100dvh - 96px);
+  overflow: auto;
+  z-index: 40;
+  background: #394252;
+  border: 1px solid #4b5568;
+  border-radius: 18px;
+  box-shadow: 0 22px 60px rgba(0,0,0,0.35);
+  padding: 16px;
+}
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(7, 10, 16, 0.48);
+  z-index: 35;
+}
+.settings-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+.settings-title {
+  font: 800 18px 'Syne', sans-serif;
+}
+.settings-subtitle {
+  font: 11px 'Space Mono', monospace;
+  color: #c3cad5;
+  margin-top: 3px;
+}
+.settings-section {
+  background: rgba(255,255,255,0.05);
+  border: 0.5px solid #4b5568;
+  border-radius: 14px;
+  padding: 12px;
+}
+.settings-section + .settings-section {
+  margin-top: 12px;
+}
+.settings-section-title {
+  font: 700 12px 'Space Mono', monospace;
+  color: #f4f7fb;
+  margin-bottom: 10px;
+}
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.settings-row-wrap {
+  flex-wrap: wrap;
+}
+.settings-row-stack {
+  flex-direction: column;
+  align-items: stretch;
+}
+.youtube-input {
+  width: 100%;
+  height: 42px;
+  border-radius: 12px;
+  border: 0.5px solid #4b5568;
+  background: rgba(255,255,255,0.08);
+  color: #ffffff;
+  padding: 0 12px;
+  font: 12px 'Space Mono', monospace;
+  outline: none;
+}
+.youtube-input::placeholder {
+  color: #b7bfcc;
+}
+.youtube-status {
+  min-height: 16px;
+  color: #b7bfcc;
+  font: 11px 'Space Mono', monospace;
+}
+.caption-btn.secondary {
+  min-width: 110px;
+}
+@media (max-width: 900px) {
+  body {
+    overflow: auto;
+    min-height: 100dvh;
+    height: auto;
+  }
+  .media-stage {
+    grid-template-columns: 1fr;
+    flex: 0 0 auto;
+  }
+  .viz-container {
+    min-height: 300px;
+  }
+  .video-panel {
+    min-height: 240px;
+  }
+  .settings-modal {
+    top: 12px;
+    right: 12px;
+    max-height: calc(100dvh - 24px);
+  }
+}
+
+
+.media-stage.video-hidden {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+
+.source-status {
+  flex-shrink: 0;
+  font: 11px 'Space Mono', monospace;
+  color: #c3cad5;
+  margin-top: -4px;
+}
+.video-placeholder-text:empty { display: none; }
+.video-placeholder-title:empty { display: none; }
+.video-placeholder-text:empty { display: none; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <div class="pulse-dot"></div>
+    <span class="title">BeatSight</span>
+  </div>
+  <button class="icon-btn settings-btn" id="settingsBtn" aria-label="Open settings" title="Settings">
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+      <path fill="currentColor" d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.03 7.03 0 0 0-1.63-.94L14.4 2.8a.5.5 0 0 0-.49-.4h-3.82a.5.5 0 0 0-.49.4l-.36 2.52c-.58.22-1.12.53-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.7 8.84a.5.5 0 0 0 .12.64l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94L2.82 14.52a.5.5 0 0 0-.12.64l1.92 3.32a.5.5 0 0 0 .6.22l2.39-.96c.51.41 1.05.72 1.63.94l.36 2.52a.5.5 0 0 0 .49.4h3.82a.5.5 0 0 0 .49-.4l.36-2.52c.58-.22 1.12-.53 1.63-.94l2.39.96a.5.5 0 0 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58ZM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7Z"/>
+    </svg>
+  </button>
+</div>
+
+<div class="upload-zone" id="uploadZone">
+  <input type="file" accept="audio/*" id="fileInput">
+  <div class="upload-icon">♪</div>
+  <div class="upload-label">Drop your audio file here</div>
+  <div class="upload-hint">click to browse · MP3 · WAV · OGG · M4A</div>
+</div>
+
+<div class="track-info" id="trackInfo">
+  <span class="track-icon">♫</span>
+  <span class="track-name" id="trackName">—</span>
+  <span class="track-dur" id="trackDur">0:00</span>
+</div>
+<div class="source-status" id="sourceStatus">Audio source: MP3 / audio file</div>
+
+<div class="mode-row">
+  <button class="mode-btn active" data-mode="wave">WAVE</button>
+  <button class="mode-btn" data-mode="bars">BARS</button>
+  <button class="mode-btn" data-mode="radial">RADIAL</button>
+  <button class="mode-btn" data-mode="spectrum">SPECTRUM</button>
+  <button class="mode-btn" data-mode="scope">SCOPE</button>
+  <button class="mode-btn" data-mode="mirror">MIRROR</button>
+  <button class="mode-btn" data-mode="stereo">STEREO</button>
+  <button class="mode-btn" data-mode="freq">FREQ</button>
+  <button class="mode-btn" data-mode="stack">STACK</button>
+  <button class="mode-btn" data-mode="line">LINE</button>
+</div>
+
+<div class="media-stage video-hidden">
+  <div class="viz-container">
+    <canvas id="vizCanvas"></canvas>
+    <div class="beat-flash" id="beatFlash"></div>
+    <div class="no-audio-msg" id="noAudioMsg">load a track to begin</div>
+  </div>
+
+  <div class="video-panel" id="videoPanel" hidden>
+    <div class="video-placeholder" id="videoPlaceholder">
+      <div class="video-placeholder-title"></div>
+      <div class="video-placeholder-text"></div>
+    </div>
+    <iframe id="youtubeFrame" class="youtube-frame" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen hidden></iframe>
+    <video id="localVideo" class="youtube-frame" controls playsinline hidden></video>
+  </div>
+</div>
+
+<div class="controls">
+  <button class="play-btn" id="playBtn" disabled>
+    <svg id="playIcon" width="22" height="22" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+  </button>
+  <div class="progress-wrap">
+    <div class="time-row">
+      <span id="curTime">0:00</span>
+      <span id="totTime">0:00</span>
+    </div>
+    <div class="progress-bar" id="progressBar">
+      <div class="progress-fill" id="progressFill"></div>
+    </div>
+  </div>
+</div>
+
+<div class="caption-panel">
+  <div class="caption-toolbar">
+    
+    <span class="caption-status" id="captionStatus"></span>
+  </div>
+  <div class="caption-display">
+    <span class="caption-badge off" id="captionModeBadge">OFF</span>
+    <div class="caption-line" id="captionEnglish"><span class="caption-placeholder">Captions will appear here</span></div>
+    <div class="caption-line secondary" id="captionOriginal"></div>
+    <div class="caption-line secondary" id="captionSecondary"></div>
+  </div>
+</div>
+
+<div class="metrics-row">
+  <div class="metric-card beat-card">
+    <div class="metric-label">Beat Pulse</div>
+    <div class="bpm-num" id="bpmNum">—</div>
+    <div class="beat-dots" id="beatDots">
+      <div class="beat-dot"></div><div class="beat-dot"></div><div class="beat-dot"></div><div class="beat-dot"></div>
+      <div class="beat-dot"></div><div class="beat-dot"></div><div class="beat-dot"></div><div class="beat-dot"></div>
+    </div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-label">Bass</div>
+    <div class="meter-bar-wrap"><div class="meter-bar bass-bar" id="bassBar"></div></div>
+    <div class="meter-val bass-val" id="bassVal">0</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-label">Mid</div>
+    <div class="meter-bar-wrap"><div class="meter-bar mid-bar" id="midBar"></div></div>
+    <div class="meter-val mid-val" id="midVal">0</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-label">High</div>
+    <div class="meter-bar-wrap"><div class="meter-bar high-bar" id="highBar"></div></div>
+    <div class="meter-val high-val" id="highVal">0</div>
+  </div>
+</div>
+
+
+<div class="modal-backdrop" id="settingsBackdrop" hidden></div>
+<div class="settings-modal" id="settingsModal" hidden>
+  <div class="settings-modal-header">
+    <div>
+      <div class="settings-title">Settings</div>
+      <div class="settings-subtitle">Subtitles, captions, and YouTube video</div>
+    </div>
+    <button class="icon-btn modal-close-btn" id="settingsCloseBtn" aria-label="Close settings">✕</button>
+  </div>
+
+  <div class="settings-section">
+    <div class="settings-section-title">Captions</div>
+    <div class="settings-row settings-row-wrap">
+      <button class="caption-btn" id="captionToggleBtn" disabled>CAPTIONS OFF</button>
+      <button class="caption-btn" id="subtitleLoadBtn">LOAD VTT/SRT</button>
+      <button class="caption-btn secondary" id="subtitleFile2Btn">LOAD 2ND SUB</button>
+      <button class="dual-toggle" id="dualSubtitleToggleBtn">DUAL OFF</button>
+      <div class="lang-pills" id="captionLangPills">
+        <button type="button" class="lang-pill active" data-lang="auto">AUTO</button>
+        <button type="button" class="lang-pill" data-lang="en">EN</button>
+        <button type="button" class="lang-pill" data-lang="es">ES</button>
+      </div>
+      <input type="hidden" id="captionLangSelect" value="auto">
+      <input type="file" id="subtitleFileInput" accept=".vtt,.srt,text/vtt,.srt" hidden>
+      <input type="file" id="subtitleFileInput2" accept=".vtt,.srt,text/vtt,.srt" hidden>
+    </div>
+  </div>
+
+  <div class="settings-section">
+    <div class="settings-section-title">YouTube video</div>
+    <div class="settings-row settings-row-stack">
+      <input class="youtube-input" id="youtubeUrlInput" type="text" placeholder="Paste YouTube link here">
+      <div class="settings-row settings-row-wrap">
+        <button class="caption-btn secondary" id="youtubeLoadBtn">SHOW VIDEO</button>
+        <button class="caption-btn secondary" id="videoUploadBtn">UPLOAD VIDEO</button>
+        <button class="caption-btn secondary" id="youtubeClearBtn">CLEAR VIDEO</button>
+        <input type="file" id="videoFileInput" accept="video/*" hidden>
+      </div>
+      <div class="youtube-status" id="youtubeStatus"></div>
+    </div>
+  </div>
+</div>
+
+<audio id="audioEl" class="hidden-audio" crossorigin="anonymous"></audio>
+
+
+<script>
+let audioCtx, analyser, mediaSource, audioUrl = '';
+let playing = false, vizMode = 'wave';
+let beatHistory = [], lastBeatTime = 0, bpmEstimate = 0, beatDotIndex = 0;
+let lastBassLevel = 0, sparklePhase = 0;
+let captionsEnabled = false, subtitleCues = [], currentCueIndex = -1, currentRenderedCueKey = '';
+let translatorCache = new Map(), activeSubtitleName = '';
+let subtitleCues2 = [], currentCueIndex2 = -1, activeSubtitleName2 = '', dualSubtitlesEnabled = false;
+
+const canvas = document.getElementById('vizCanvas');
+const ctx2 = canvas.getContext('2d');
+const audioEl = document.getElementById('audioEl');
+const playBtn = document.getElementById('playBtn');
+const playIcon = document.getElementById('playIcon');
+const progressFill = document.getElementById('progressFill');
+const curTimeEl = document.getElementById('curTime');
+const totTimeEl = document.getElementById('totTime');
+const bpmNum = document.getElementById('bpmNum');
+const beatFlash = document.getElementById('beatFlash');
+const beatDots = document.querySelectorAll('.beat-dot');
+const noAudioMsg = document.getElementById('noAudioMsg');
+const trackInfo = document.getElementById('trackInfo');
+const sourceStatus = document.getElementById('sourceStatus');
+const uploadZone = document.getElementById('uploadZone');
+const captionToggleBtn = document.getElementById('captionToggleBtn');
+const subtitleLoadBtn = document.getElementById('subtitleLoadBtn');
+const subtitleFile2Btn = document.getElementById('subtitleFile2Btn');
+const dualSubtitleToggleBtn = document.getElementById('dualSubtitleToggleBtn');
+const subtitleFileInput = document.getElementById('subtitleFileInput');
+const subtitleFileInput2 = document.getElementById('subtitleFileInput2');
+const captionLangSelect = document.getElementById('captionLangSelect');
+const captionStatus = document.getElementById('captionStatus');
+const captionModeBadge = document.getElementById('captionModeBadge');
+const captionEnglish = document.getElementById('captionEnglish');
+const captionOriginal = document.getElementById('captionOriginal');
+const captionSecondary = document.getElementById('captionSecondary');
+const settingsBtn = document.getElementById('settingsBtn');
+const settingsModal = document.getElementById('settingsModal');
+const settingsBackdrop = document.getElementById('settingsBackdrop');
+const settingsCloseBtn = document.getElementById('settingsCloseBtn');
+const youtubeUrlInput = document.getElementById('youtubeUrlInput');
+const youtubeLoadBtn = document.getElementById('youtubeLoadBtn');
+const youtubeClearBtn = document.getElementById('youtubeClearBtn');
+const youtubeStatus = document.getElementById('youtubeStatus');
+const youtubeFrame = document.getElementById('youtubeFrame');
+const videoPlaceholder = document.getElementById('videoPlaceholder');
+const videoPlaceholderTextEl = document.querySelector('.video-placeholder-text');
+const videoPlaceholderTitleEl = document.querySelector('.video-placeholder-title');
+const videoPanel = document.getElementById('videoPanel');
+const mediaStage = document.querySelector('.media-stage');
+const localVideo = document.getElementById('localVideo');
+const videoUploadBtn = document.getElementById('videoUploadBtn');
+const videoFileInput = document.getElementById('videoFileInput');
+
+
+if (videoPlaceholderTextEl) videoPlaceholderTextEl.textContent = '';
+if (videoPlaceholderTitleEl) videoPlaceholderTitleEl.textContent = '';
+
+function openSettings() {
+  settingsModal.hidden = false;
+  settingsBackdrop.hidden = false;
+}
+function closeSettings() {
+  settingsModal.hidden = true;
+  settingsBackdrop.hidden = true;
+}
+function setYouTubeStatus(message) {
+  youtubeStatus.textContent = message || '';
+}
+function extractYouTubeId(input) {
+  if (!input) return '';
+  try {
+    const url = new URL(input.trim());
+    const host = url.hostname.replace(/^www\./, '');
+    if (host === 'youtu.be') return url.pathname.slice(1);
+    if (host.includes('youtube.com')) {
+      if (url.searchParams.get('v')) return url.searchParams.get('v');
+      const parts = url.pathname.split('/').filter(Boolean);
+      const embedIdx = parts.findIndex(p => ['embed', 'shorts', 'live'].includes(p));
+      if (embedIdx !== -1 && parts[embedIdx + 1]) return parts[embedIdx + 1];
+    }
+  } catch (e) {
+    const raw = input.trim();
+    if (/^[A-Za-z0-9_-]{11}$/.test(raw)) return raw;
+  }
+  return '';
+}
+function showVideoPanel() {
+  videoPanel.hidden = false;
+  mediaStage.classList.remove('video-hidden');
+}
+function hideVideoPanel() {
+  videoPanel.hidden = true;
+  mediaStage.classList.add('video-hidden');
+  videoPlaceholder.hidden = true;
+}
+function loadYouTubeVideo() {
+  const raw = youtubeUrlInput.value.trim();
+  const videoId = extractYouTubeId(raw);
+  if (!videoId) {
+    setYouTubeStatus('Could not read that YouTube link.');
+    return;
+  }
+
+  localVideo.pause();
+  localVideo.removeAttribute('src');
+  localVideo.load();
+  localVideo.hidden = true;
+
+  videoPlaceholder.hidden = true;
+  showVideoPanel();
+
+  youtubeFrame.hidden = true;
+  youtubeFrame.src = `https://www.youtube.com/embed/${videoId}?enablejsapi=1&playsinline=1&autoplay=0&mute=1&controls=1&rel=0&modestbranding=1`;
+
+  setYouTubeStatus('Video loaded. Some YouTube videos may block embedding.');
+  setTimeout(muteYouTubeVideo, 150);
+  setTimeout(muteYouTubeVideo, 800);
+}
+function clearYouTubeVideo() {
+  youtubeFrame.src = '';
+  youtubeFrame.hidden = true;
+  localVideo.pause();
+  localVideo.removeAttribute('src');
+  localVideo.load();
+  localVideo.hidden = true;
+  videoPlaceholder.hidden = true;
+  setYouTubeStatus('');
+  hideVideoPanel();
+  if (currentAudioSourceType === 'video') {
+    if (audioEl && audioEl.src) {
+      connectMediaElementForAnalysis(audioEl, 'audio');
+      updateTrackDisplay((document.getElementById('trackName').textContent || 'Audio file'), audioEl.duration || 0);
+      setSourceStatus('Audio source: MP3 / audio file');
+      syncPlayerStateFromMedia();
+    } else {
+      currentAudioSourceType = 'audio';
+      currentMediaElement = null;
+      playBtn.disabled = true;
+      noAudioMsg.style.display = '';
+    }
+  }
+}
+
+
+function loadLocalVideoFile(file) {
+  if (!file) return;
+  const objectUrl = URL.createObjectURL(file);
+  youtubeFrame.src = '';
+  youtubeFrame.hidden = true;
+  localVideo.pause();
+  localVideo.src = objectUrl;
+  localVideo.hidden = false;
+  videoPlaceholder.hidden = true;
+  showVideoPanel();
+
+  const finish = () => {
+    connectMediaElementForAnalysis(localVideo, 'video');
+    updateTrackDisplay(file.name.replace(/\.[^.]+$/, ''), localVideo.duration || 0);
+    refreshTotalDurationFromActiveMedia();
+    setSourceStatus('Audio source: uploaded video');
+    playBtn.disabled = false;
+    playBtn.removeAttribute('disabled');
+    syncPlayerStateFromMedia();
+    setYouTubeStatus(`Local video loaded · ${file.name}`);
+  };
+
+  if (localVideo.readyState >= 1) finish();
+  else localVideo.addEventListener('loadedmetadata', finish, { once: true });
+}
+
+
+
+function muteYouTubeVideo() {
+  try {
+    if (!youtubeFrame.hidden && youtubeFrame.src) {
+      youtubeFrame.contentWindow?.postMessage(JSON.stringify({
+        event: 'command',
+        func: 'mute',
+        args: []
+      }), '*');
+      youtubeFrame.contentWindow?.postMessage(JSON.stringify({
+        event: 'command',
+        func: 'setVolume',
+        args: [0]
+      }), '*');
+    }
+  } catch (e) {}
+}
+
+function syncVideoPlay() {
+  try {
+    if (!youtubeFrame.hidden && youtubeFrame.src) {
+      muteYouTubeVideo();
+      youtubeFrame.contentWindow?.postMessage(JSON.stringify({
+        event: 'command',
+        func: 'playVideo',
+        args: []
+      }), '*');
+      muteYouTubeVideo();
+    }
+    if (!localVideo.hidden && localVideo.src) {
+      const playPromise = localVideo.play();
+      if (playPromise && typeof playPromise.catch === 'function') playPromise.catch(() => {});
+    }
+  } catch (e) {}
+}
+
+function syncVideoPause() {
+  try {
+    if (!youtubeFrame.hidden && youtubeFrame.src) {
+      youtubeFrame.contentWindow?.postMessage(JSON.stringify({
+        event: 'command',
+        func: 'pauseVideo',
+        args: []
+      }), '*');
+    }
+    if (!localVideo.hidden && localVideo.src) {
+      localVideo.pause();
+    }
+  } catch (e) {}
+}
+
+function syncVideoSeek(timeInSeconds) {
+  try {
+    const t = Math.max(0, Number(timeInSeconds) || 0);
+    if (!youtubeFrame.hidden && youtubeFrame.src) {
+      muteYouTubeVideo();
+      youtubeFrame.contentWindow?.postMessage(JSON.stringify({
+        event: 'command',
+        func: 'seekTo',
+        args: [t, true]
+      }), '*');
+      muteYouTubeVideo();
+    }
+    if (!localVideo.hidden && localVideo.src) {
+      if (Math.abs((localVideo.currentTime || 0) - t) > 0.2) {
+        localVideo.currentTime = t;
+      }
+    }
+  } catch (e) {}
+}
+
+function syncVideoToAudioState() {
+  const current = playing ? (audioCtx.currentTime - startTime) : pauseOffset;
+  syncVideoSeek(current);
+  if (playing) syncVideoPlay();
+  else syncVideoPause();
+}
+
+
+function setSourceStatus(message) {
+  if (sourceStatus) sourceStatus.textContent = message || '';
+}
+
+function ensureAudioEngine() {
+  if (!audioCtx || audioCtx.state === 'closed') {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (!analyser) {
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 2048;
+    analyser.smoothingTimeConstant = 0.82;
+    analyser.connect(audioCtx.destination);
+  }
+}
+
+function connectMediaElementForAnalysis(mediaEl, typeLabel) {
+  ensureAudioEngine();
+  currentMediaElement = mediaEl;
+  currentAudioSourceType = typeLabel;
+
+  if (!mediaEl._beatsightSourceNode) {
+    try {
+      mediaEl._beatsightSourceNode = audioCtx.createMediaElementSource(mediaEl);
+      mediaEl._beatsightSourceNode.connect(analyser);
+      mediaEl._beatsightSourceNode.connect(audioCtx.destination);
+    } catch (e) {
+      console.warn('Media source connect warning:', e);
+    }
+  }
+
+  playBtn.disabled = false;
+  playBtn.removeAttribute('disabled');
+  playBtn.removeAttribute('disabled');
+  noAudioMsg.style.display = 'none';
+  cancelAnimationFrame(animFrame);
+  draw();
+}
+
+function getActiveMediaElement() {
+  if (currentMediaElement) {
+    if (currentMediaElement === localVideo && localVideo && localVideo.src) return localVideo;
+    if (currentMediaElement === audioEl && audioEl && audioEl.src) return audioEl;
+  }
+  if (currentAudioSourceType === 'video' && localVideo && localVideo.src) return localVideo;
+  if (audioEl && audioEl.src) return audioEl;
+  return null;
+}
+
+function updateTrackDisplay(name, durationSeconds) {
+  document.getElementById('trackName').textContent = name || '—';
+  const safeDuration = Number(durationSeconds || 0);
+  document.getElementById('trackDur').textContent = fmt(safeDuration);
+  totTimeEl.textContent = fmt(safeDuration);
+  trackInfo.style.display = 'flex';
+}
+
+function syncPlayerStateFromMedia() {
+  const el = getActiveMediaElement();
+  if (!el || !audioCtx) return;
+  pauseOffset = el.currentTime || 0;
+  startTime = audioCtx.currentTime - pauseOffset;
+  playing = !el.paused && !el.ended;
+  playIcon.innerHTML = playing
+    ? '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>'
+    : '<path d="M8 5v14l11-7z"/>';
+}
+
+function fmt(s) {
+  s = Math.max(0, Math.floor(s || 0));
+  return Math.floor(s/60) + ':' + String(s%60).padStart(2,'0');
+}
+function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+
+function resizeCanvas() {
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  const width = Math.max(1, Math.floor(rect.width));
+  const height = Math.max(1, Math.floor(rect.height));
+  canvas.width = width * dpr;
+  canvas.height = height * dpr;
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+function setCaptionStatus(text) {
+  captionStatus.textContent = text;
+}
+function setCaptionBadge(text, active = false) {
+  captionModeBadge.textContent = text;
+  captionModeBadge.classList.toggle('off', !active);
+}
+function clearCaptions() {
+  captionEnglish.innerHTML = '<span class="caption-placeholder">Captions will appear here</span>';
+  captionOriginal.textContent = '';
+  captionSecondary.textContent = '';
+  setCaptionBadge(captionsEnabled ? 'READY' : 'OFF', captionsEnabled);
+}
+clearCaptions();
+
+function filterProfanity(text) {
+  if (!text) return '';
+  const patterns = [
+    /\bfuck(?:ing|ed|er|ers)?\b/gi,
+    /\bshit(?:ty|ting|ted|s)?\b/gi,
+    /\bbitch(?:es)?\b/gi,
+    /\basshole(?:s)?\b/gi,
+    /\bdamn\b/gi,
+    /\bmotherfucker(?:s)?\b/gi
+  ];
+  let out = text;
+  patterns.forEach(re => { out = out.replace(re, '[---]'); });
+  return out;
+}
+
+async function ensureAudioContext() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 2048;
+    analyser.smoothingTimeConstant = 0.82;
+    analyser.connect(audioCtx.destination);
+  }
+  if (audioCtx.state === 'suspended') {
+    try { await audioCtx.resume(); } catch (e) {}
+  }
+}
+
+
+async function loadFile(file) {
+  ensureAudioEngine();
+  const objectUrl = URL.createObjectURL(file);
+  audioEl.src = objectUrl;
+  audioEl.load();
+
+  await new Promise(resolve => {
+    if (audioEl.readyState >= 1) resolve();
+    else audioEl.addEventListener('loadedmetadata', resolve, { once: true });
+  });
+
+  connectMediaElementForAnalysis(audioEl, 'audio');
+  updateTrackDisplay(file.name.replace(/\.[^.]+$/, ''), audioEl.duration || 0);
+  refreshTotalDurationFromActiveMedia();
+  setSourceStatus('Audio source: MP3 / audio file');
+  pauseOffset = 0;
+  beatHistory = [];
+  bpmEstimate = 0;
+  bpmNum.textContent = '—';
+  currentRenderedCueKey = '';
+  playBtn.disabled = false;
+  if (audioCtx && audioCtx.state === 'suspended') {
+    try { await audioCtx.resume(); } catch(e) {}
+  }
+}
+
+document.getElementById('fileInput').addEventListener('change', e => {
+  if (e.target.files[0]) loadFile(e.target.files[0]);
+});
+
+uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag'));
+uploadZone.addEventListener('drop', e => {
+  e.preventDefault();
+  uploadZone.classList.remove('drag');
+  if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
+});
+
+async function startPlayback() {
+  const activeEl = getActiveMediaElement();
+  if (!activeEl) return;
+  ensureAudioEngine();
+  if (audioCtx && audioCtx.state === 'suspended') {
+    try { await audioCtx.resume(); } catch (e) {}
+  }
+  try {
+    await activeEl.play();
+    syncPlayerStateFromMedia();
+    if (currentAudioSourceType === 'audio') syncVideoPlay();
+    cancelAnimationFrame(animFrame);
+    draw();
+    updateDisplayedCaption(true);
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+function pausePlayback() {
+  const activeEl = getActiveMediaElement();
+  if (!activeEl) return;
+  activeEl.pause();
+  syncPlayerStateFromMedia();
+  if (currentAudioSourceType === 'audio') syncVideoPause();
+  updateDisplayedCaption(true);
+}
+
+playBtn.addEventListener('click', async () => {
+  const activeEl = getActiveMediaElement();
+  if (!activeEl) {
+    console.warn('No active media element found.');
+    return;
+  }
+  playBtn.disabled = false;
+  playBtn.removeAttribute('disabled');
+  ensureAudioEngine();
+  if (audioCtx && audioCtx.state === 'suspended') {
+    try { await audioCtx.resume(); } catch (e) { console.warn(e); }
+  }
+  try {
+    if (activeEl.paused || activeEl.ended) {
+      await startPlayback();
+    } else {
+      pausePlayback();
+    }
+  } catch (e) {
+    console.error('Play button failed:', e);
+  }
+});
+
+
+function refreshTotalDurationFromActiveMedia() {
+  const activeEl = getActiveMediaElement();
+  if (!activeEl) return;
+  const duration = Number(activeEl.duration || 0);
+  if (Number.isFinite(duration) && duration > 0) {
+    totTimeEl.textContent = fmt(duration);
+    const trackDurEl = document.getElementById('trackDur');
+    if (trackDurEl) trackDurEl.textContent = fmt(duration);
+  }
+}
+
+function refreshProgressFromActiveMedia() {
+  const activeEl = getActiveMediaElement();
+  if (!activeEl) return;
+  const duration = Number(activeEl.duration || 0);
+  const t = Number(activeEl.currentTime || 0);
+  if (duration > 0) {
+    const p = Math.min(t / duration, 1);
+    progressFill.style.width = Math.round(p * 100) + '%';
+    totTimeEl.textContent = fmt(duration);
+  } else {
+    progressFill.style.width = '0%';
+  }
+  curTimeEl.textContent = fmt(t);
+}
+
+[audioEl, localVideo].forEach(el => {
+  if (!el) return;
+
+  el.addEventListener('loadedmetadata', () => {
+    if ((el === audioEl && currentAudioSourceType === 'audio') || (el === localVideo && currentAudioSourceType === 'video')) {
+      updateTrackDisplay(document.getElementById('trackName').textContent || '—', el.duration || 0);
+      refreshTotalDurationFromActiveMedia();
+      refreshProgressFromActiveMedia();
+    }
+  });
+
+  el.addEventListener('timeupdate', () => {
+    if ((el === audioEl && currentAudioSourceType === 'audio') || (el === localVideo && currentAudioSourceType === 'video')) {
+      pauseOffset = el.currentTime || 0;
+      refreshProgressFromActiveMedia();
+      updateDisplayedCaption();
+    }
+  });
+
+  el.addEventListener('play', () => {
+    if ((el === audioEl && currentAudioSourceType === 'audio') || (el === localVideo && currentAudioSourceType === 'video')) {
+      syncPlayerStateFromMedia();
+      currentRenderedCueKey = '';
+      cancelAnimationFrame(animFrame);
+      draw();
+      updateDisplayedCaption(true);
+    }
+  });
+
+  el.addEventListener('pause', () => {
+    if ((el === audioEl && currentAudioSourceType === 'audio') || (el === localVideo && currentAudioSourceType === 'video')) {
+      syncPlayerStateFromMedia();
+      currentRenderedCueKey = '';
+      updateDisplayedCaption(true);
+    }
+  });
+
+  el.addEventListener('seeking', () => {
+    if ((el === audioEl && currentAudioSourceType === 'audio') || (el === localVideo && currentAudioSourceType === 'video')) {
+      currentRenderedCueKey = '';
+      refreshProgressFromActiveMedia();
+      updateDisplayedCaption(true);
+    }
+  });
+
+  el.addEventListener('seeked', () => {
+    if ((el === audioEl && currentAudioSourceType === 'audio') || (el === localVideo && currentAudioSourceType === 'video')) {
+      pauseOffset = el.currentTime || 0;
+      currentRenderedCueKey = '';
+      refreshProgressFromActiveMedia();
+      updateDisplayedCaption(true);
+    }
+  });
+
+  el.addEventListener('ended', () => {
+    if ((el === audioEl && currentAudioSourceType === 'audio') || (el === localVideo && currentAudioSourceType === 'video')) {
+      syncPlayerStateFromMedia();
+      progressFill.style.width = '0%';
+      curTimeEl.textContent = '0:00';
+      currentCueIndex = -1;
+      currentCueIndex2 = -1;
+      currentRenderedCueKey = '';
+      if (currentAudioSourceType === 'audio') {
+        syncVideoPause();
+        syncVideoSeek(0);
+      }
+      updateDisplayedCaption(true);
+    }
+  });
+
+  el.addEventListener('ratechange', () => {
+    if ((el === audioEl && currentAudioSourceType === 'audio') || (el === localVideo && currentAudioSourceType === 'video')) {
+      currentRenderedCueKey = '';
+      updateDisplayedCaption(true);
+    }
+  });
+});
+
+document.getElementById('progressBar').addEventListener('click', e => {
+  const activeEl = getActiveMediaElement();
+  if (!activeEl || !activeEl.duration) return;
+  const rect = e.currentTarget.getBoundingClientRect();
+  const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+  const newTime = ratio * activeEl.duration;
+  activeEl.currentTime = newTime;
+  pauseOffset = newTime;
+  refreshProgressFromActiveMedia();
+  if (currentAudioSourceType === 'audio') {
+    syncVideoSeek(newTime);
+    if (activeEl.paused) syncVideoPause();
+  }
+  currentRenderedCueKey = '';
+  updateDisplayedCaption(true);
+});
+
+document.querySelectorAll('.mode-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    vizMode = btn.dataset.mode;
+  });
+});
+
+
+function normalizeCueText(text) {
+  return String(text || '')
+    .replace(/\r/g, '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function parseTimestamp(raw) {
+  const value = String(raw || '').trim().replace(',', '.');
+  const parts = value.split(':').map(Number);
+  if (parts.some(Number.isNaN)) return NaN;
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  if (parts.length === 2) return parts[0] * 60 + parts[1];
+  return NaN;
+}
+
+function parseVttOrSrt(text) {
+  const cleaned = String(text || '').replace(/^\uFEFF/, '').replace(/\r/g, '');
+  const blocks = cleaned.split(/\n\s*\n/);
+  const cues = [];
+  for (const block of blocks) {
+    const lines = block.split('\n').map(line => line.trimEnd());
+    if (!lines.length) continue;
+    let i = 0;
+    if (/^WEBVTT/i.test(lines[0])) continue;
+    if (/^NOTE($|\s)/i.test(lines[0])) continue;
+    if (/^\d+$/.test(lines[0].trim())) i = 1;
+    if (!lines[i] || !lines[i].includes('-->')) continue;
+    const [startRaw, endRaw] = lines[i].split(/\s+-->\s+/);
+    const start = parseTimestamp(startRaw);
+    const end = parseTimestamp((endRaw || '').split(/\s+/)[0]);
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) continue;
+    const textLines = lines.slice(i + 1).filter(Boolean);
+    const cueText = normalizeCueText(textLines.join(' '));
+    if (!cueText) continue;
+    cues.push({ start, end, text: cueText });
+  }
+  return cues.sort((a, b) => a.start - b.start);
+}
+
+function guessCueLanguage(text) {
+  const selected = captionLangSelect.value;
+  if (selected !== 'auto') return selected.toLowerCase();
+  const sample = ' ' + String(text || '').toLowerCase() + ' ';
+  const spanishHints = [' el ', ' la ', ' que ', ' de ', ' y ', ' no ', ' por ', ' con ', ' para ', ' una ', ' un ', ' yo ', ' tu ', ' te ', ' lo ', ' me ', ' mi ', ' se ', ' en ', ' es ', ' como ', ' pero ', ' corazón', 'ción', 'ñ'];
+  const score = spanishHints.reduce((acc, hint) => acc + (sample.includes(hint) ? 1 : 0), 0);
+  return score >= 2 ? 'es' : 'en';
+}
+
+async function getTranslator(sourceLanguage) {
+  const lang = (sourceLanguage || 'en').toLowerCase();
+  const key = lang + '->en';
+  if (translatorCache.has(key)) return translatorCache.get(key);
+  if (typeof Translator === 'undefined' || !window.isSecureContext || lang.startsWith('en')) {
+    translatorCache.set(key, null);
+    return null;
+  }
+  try {
+    if (typeof Translator.availability === 'function') {
+      const availability = await Translator.availability({ sourceLanguage: lang, targetLanguage: 'en' });
+      if (availability === 'unavailable') {
+        translatorCache.set(key, null);
+        return null;
+      }
+    }
+    const translator = await Translator.create({ sourceLanguage: lang, targetLanguage: 'en' });
+    translatorCache.set(key, translator);
+    return translator;
+  } catch (e) {
+    translatorCache.set(key, null);
+    return null;
+  }
+}
+
+async function translateCueText(text, sourceLanguage) {
+  const lang = (sourceLanguage || 'en').toLowerCase();
+  if (!text) return text;
+  if (lang.startsWith('en')) return text;
+  const translator = await getTranslator(lang);
+  if (!translator) return null;
+  try {
+    return await translator.translate(text);
+  } catch (e) {
+    return null;
+  }
+}
+
+function renderCaption(englishText, originalText, secondaryText, badgeText = 'CAPTIONS') {
+  const cleanEnglish = filterProfanity(englishText || '');
+  const cleanOriginal = filterProfanity(originalText || '');
+  const cleanSecondary = filterProfanity(secondaryText || '');
+  captionEnglish.textContent = cleanEnglish || '…';
+
+  if (cleanOriginal && cleanOriginal.trim().toLowerCase() !== cleanEnglish.trim().toLowerCase()) {
+    captionOriginal.textContent = cleanOriginal;
+  } else {
+    captionOriginal.textContent = '';
+  }
+
+  if (dualSubtitlesEnabled && cleanSecondary) {
+    const dupA = cleanSecondary.trim().toLowerCase() === cleanEnglish.trim().toLowerCase();
+    const dupB = cleanSecondary.trim().toLowerCase() === cleanOriginal.trim().toLowerCase();
+    captionSecondary.textContent = (dupA || dupB) ? '' : cleanSecondary;
+  } else {
+    captionSecondary.textContent = '';
+  }
+
+  setCaptionBadge(badgeText, true);
+}
+
+async function updateDisplayedCaption(force = false) {
+  if (!captionsEnabled || !subtitleCues.length || !audioEl.src) {
+    if (force) clearCaptions();
+    return;
+  }
+
+  const t = audioEl.currentTime || 0;
+  const primary = getActiveCueAtTime(subtitleCues, t);
+  currentCueIndex = primary.index;
+
+  if (!primary.cue) {
+    currentCueIndex = -1;
+    currentCueIndex2 = -1;
+    if (force || currentRenderedCueKey !== '__blank__') {
+      currentRenderedCueKey = '__blank__';
+      captionEnglish.innerHTML = '<span class="caption-placeholder">Waiting for next caption…</span>';
+      captionOriginal.textContent = activeSubtitleName ? activeSubtitleName : '';
+      captionSecondary.textContent = dualSubtitlesEnabled && activeSubtitleName2 ? activeSubtitleName2 : '';
+      setCaptionBadge('READY', true);
+    }
+    return;
+  }
+
+  const secondary = dualSubtitlesEnabled && subtitleCues2.length ? getActiveCueAtTime(subtitleCues2, t) : { cue: null, index: -1 };
+  currentCueIndex2 = secondary.index;
+
+  const primaryCue = primary.cue;
+  const secondaryCue = secondary.cue;
+  const cueKey = [
+    primary.index, primaryCue.start, primaryCue.end, primaryCue.text,
+    secondary.index, secondaryCue ? secondaryCue.start : '', secondaryCue ? secondaryCue.end : '', secondaryCue ? secondaryCue.text : '',
+    dualSubtitlesEnabled ? 'dual' : 'single'
+  ].join('|');
+
+  if (!force && currentRenderedCueKey === cueKey) return;
+  currentRenderedCueKey = cueKey;
+
+  const detectedLanguage = guessCueLanguage(primaryCue.text);
+  const translated = await translateCueText(primaryCue.text, detectedLanguage);
+  const englishText = translated || primaryCue.text;
+
+  let secondaryText = '';
+  if (secondaryCue) {
+    secondaryText = secondaryCue.text;
+  }
+
+  let originalText = translated ? primaryCue.text : '';
+  if (!translated && dualSubtitlesEnabled && secondaryCue) {
+    originalText = primaryCue.text;
+  }
+
+  let badge = translated ? 'TRANSLATED' : (detectedLanguage.startsWith('en') ? 'ENGLISH' : 'ORIGINAL');
+  if (dualSubtitlesEnabled && secondaryCue) badge = translated ? 'DUAL + EN' : 'DUAL';
+
+  renderCaption(englishText, originalText, secondaryText, badge);
+
+  if (dualSubtitlesEnabled && secondaryCue) {
+    setCaptionStatus(`dual subtitles active · ${activeSubtitleName}${activeSubtitleName2 ? ' + ' + activeSubtitleName2 : ''}`);
+  } else {
+    setCaptionStatus(
+      translated
+        ? 'subtitle translated to English'
+        : detectedLanguage.startsWith('en')
+          ? 'subtitle already in English'
+          : 'showing original subtitle text'
+    );
+  }
+}
+
+function stopCaptions(updateUi = true) {
+  currentCueIndex = -1;
+  currentRenderedCueKey = '';
+  if (updateUi) {
+    captionToggleBtn.textContent = 'CAPTIONS OFF';
+    captionToggleBtn.classList.remove('active');
+    setCaptionBadge('OFF', false);
+    setCaptionStatus(subtitleCues.length ? 'captions off' : '');
+  }
+}
+
+async function loadSubtitleFile(file, which = 1) {
+  const rawText = await file.text();
+  const cues = parseVttOrSrt(rawText);
+  if (!cues.length) {
+    setCaptionStatus('could not read subtitle cues from file');
+    return;
+  }
+  if (which === 2) {
+    subtitleCues2 = cues;
+    activeSubtitleName2 = file.name;
+    currentCueIndex2 = -1;
+  } else {
+    subtitleCues = cues;
+    activeSubtitleName = file.name;
+    currentCueIndex = -1;
+  }
+  currentRenderedCueKey = '';
+  const total = (subtitleCues.length ? 1 : 0) + (subtitleCues2.length ? 1 : 0);
+  const dualReady = subtitleCues.length && subtitleCues2.length;
+  setCaptionStatus(
+    which === 2
+      ? `second subtitle loaded · ${file.name}`
+      : `subtitle loaded · ${file.name}`
+  );
+  if (dualReady && dualSubtitlesEnabled) {
+    setCaptionStatus(`dual subtitles ready · ${activeSubtitleName} + ${activeSubtitleName2}`);
+  } else if (total > 1) {
+    setCaptionStatus(`two subtitle files loaded · turn dual on when ready`);
+  }
+  clearCaptions();
+  if (captionsEnabled) updateDisplayedCaption(true);
+}
+
+function getActiveCueAtTime(cues, t) {
+  for (let i = 0; i < cues.length; i++) {
+    const cue = cues[i];
+    if (t >= cue.start && t <= cue.end) return { cue, index: i };
+    if (cue.start > t) break;
+  }
+  return { cue: null, index: -1 };
+}
+
+subtitleLoadBtn.addEventListener('click', () => subtitleFileInput.click());
+subtitleFile2Btn.addEventListener('click', () => subtitleFileInput2.click());
+subtitleFileInput.addEventListener('change', e => {
+  if (e.target.files[0]) loadSubtitleFile(e.target.files[0], 1);
+});
+subtitleFileInput2.addEventListener('change', e => {
+  if (e.target.files[0]) loadSubtitleFile(e.target.files[0], 2);
+});
+dualSubtitleToggleBtn.addEventListener('click', () => {
+  if (!subtitleCues.length || !subtitleCues2.length) {
+    setCaptionStatus('load both subtitle files first');
+    return;
+  }
+  dualSubtitlesEnabled = !dualSubtitlesEnabled;
+  dualSubtitleToggleBtn.classList.toggle('active', dualSubtitlesEnabled);
+  dualSubtitleToggleBtn.textContent = dualSubtitlesEnabled ? 'DUAL ON' : 'DUAL OFF';
+  currentRenderedCueKey = '';
+  updateDisplayedCaption(true);
+});
+
+captionToggleBtn.addEventListener('click', async () => {
+  if (!subtitleCues.length) {
+    setCaptionStatus('load at least one subtitle file first');
+    return;
+  }
+  captionsEnabled = !captionsEnabled;
+  captionToggleBtn.classList.toggle('active', captionsEnabled);
+  captionToggleBtn.textContent = captionsEnabled ? 'CAPTIONS ON' : 'CAPTIONS OFF';
+  if (captionsEnabled) {
+    setCaptionStatus('subtitle captions enabled');
+    updateDisplayedCaption(true);
+  } else {
+    stopCaptions();
+    clearCaptions();
+  }
+});
+
+captionLangSelect.addEventListener('change', async () => {
+  currentRenderedCueKey = '';
+  setCaptionStatus(subtitleCues.length ? 'subtitle language updated' : 'subtitle language updated · load subtitle file');
+  updateDisplayedCaption(true);
+});
+
+function draw() {
+  window._animFrame = requestAnimationFrame(draw);
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.width / dpr;
+  const H = canvas.height / dpr;
+
+  if (!analyser) {
+    ctx2.save();
+    ctx2.scale(dpr, dpr);
+    ctx2.clearRect(0, 0, W, H);
+    ctx2.restore();
+    return;
+  }
+
+  const bufLen = analyser.frequencyBinCount;
+  const freqData = new Uint8Array(bufLen);
+  const timeData = new Uint8Array(analyser.fftSize);
+  analyser.getByteFrequencyData(freqData);
+  analyser.getByteTimeDomainData(timeData);
+
+  const bassEnd = Math.max(1, Math.floor(bufLen * 0.05));
+  const midEnd  = Math.max(bassEnd + 1, Math.floor(bufLen * 0.3));
+  let bSum = 0, mSum = 0, hSum = 0;
+  for (let i = 0; i < bassEnd; i++) bSum += freqData[i];
+  for (let i = bassEnd; i < midEnd; i++) mSum += freqData[i];
+  for (let i = midEnd; i < bufLen; i++) hSum += freqData[i];
+
+  const bassLvl = Math.round(bSum / bassEnd);
+  const midLvl  = Math.round(mSum / Math.max(1, midEnd - bassEnd));
+  const highLvl = Math.round(hSum / Math.max(1, bufLen - midEnd));
+  const avgLvl = Math.round((bassLvl + midLvl + highLvl) / 3);
+
+  document.getElementById('bassBar').style.width = Math.round(bassLvl / 2.55) + '%';
+  document.getElementById('midBar').style.width  = Math.round(midLvl / 2.55) + '%';
+  document.getElementById('highBar').style.width = Math.round(highLvl / 2.55) + '%';
+  document.getElementById('bassVal').textContent = bassLvl;
+  document.getElementById('midVal').textContent  = midLvl;
+  document.getElementById('highVal').textContent = highLvl;
+
+  if (bassLvl > 110 && bassLvl > lastBassLevel * 1.12) {
+    const now = performance.now();
+    if (now - lastBeatTime > 220) {
+      if (lastBeatTime > 0) {
+        beatHistory.push(now - lastBeatTime);
+        if (beatHistory.length > 12) beatHistory.shift();
+        const avg = beatHistory.reduce((a,b) => a + b, 0) / beatHistory.length;
+        bpmEstimate = Math.round(60000 / avg);
+        bpmNum.textContent = bpmEstimate;
+      }
+      lastBeatTime = now;
+      beatFlash.style.opacity = '1';
+      setTimeout(() => beatFlash.style.opacity = '0', 90);
+      const di = beatDotIndex % 8;
+      beatDots[di].classList.add('on');
+      setTimeout(() => beatDots[di].classList.remove('on'), 220);
+      beatDotIndex++;
+    }
+  }
+  lastBassLevel = bassLvl;
+
+  ctx2.save();
+  ctx2.scale(dpr, dpr);
+  ctx2.clearRect(0, 0, W, H);
+
+  if (vizMode === 'wave') drawWave(timeData, W, H, bassLvl);
+  else if (vizMode === 'bars') drawBars(freqData, W, H);
+  else if (vizMode === 'radial') drawRadial(freqData, timeData, W, H, bassLvl);
+  else if (vizMode === 'mirror') drawMirror(freqData, W, H, bassLvl, highLvl);
+  else if (vizMode === 'spectrum') drawSpectrum(freqData, W, H, bassLvl, midLvl, highLvl);
+  else if (vizMode === 'scope') drawScope(timeData, W, H, bassLvl, midLvl, highLvl);
+  else if (vizMode === 'stereo') drawStereo(freqData, W, H, bassLvl, midLvl, highLvl);
+  else if (vizMode === 'freq') drawFreqBars(freqData, W, H);
+  else if (vizMode === 'stack') drawStack(freqData, W, H);
+  else if (vizMode === 'line') drawLineSpectrum(freqData, W, H);
+  else drawWave(timeData, W, H, bassLvl);
+
+  ctx2.restore();
+}
+draw();
+
+function drawBackground(W, H, alpha = 0.22) {
+  const grad = ctx2.createLinearGradient(0, 0, W, H);
+  grad.addColorStop(0, `rgba(0,229,160,${alpha})`);
+  grad.addColorStop(0.5, 'rgba(0,180,255,0.06)');
+  grad.addColorStop(1, 'rgba(255,77,109,0.10)');
+  ctx2.fillStyle = grad;
+  ctx2.fillRect(0, 0, W, H);
+}
+function drawWave(timeData, W, H, bassLvl) {
+  drawBackground(W, H, 0.14);
+  const boost = bassLvl / 255;
+  const layers = [
+    { color:'#00e5a0', alpha:1.0, yOff:0 },
+    { color:'#00b4ff', alpha:0.3, yOff:5*boost },
+    { color:'#ff4d6d', alpha:0.15, yOff:-5*boost }
+  ];
+  layers.forEach(l => {
+    ctx2.globalAlpha = l.alpha;
+    ctx2.strokeStyle = l.color;
+    ctx2.lineWidth = 2.2;
+    ctx2.beginPath();
+    const sliceW = W / timeData.length;
+    for (let i=0; i<timeData.length; i++) {
+      const v = (timeData[i]/128.0)-1;
+      const x = i*sliceW;
+      const y = H/2 + v*H/2*(0.85+boost*0.45) + l.yOff;
+      if (i===0) ctx2.moveTo(x,y); else ctx2.lineTo(x,y);
+    }
+    ctx2.stroke();
+  });
+  ctx2.globalAlpha = 0.08;
+  ctx2.strokeStyle = '#00e5a0';
+  ctx2.lineWidth = 0.5;
+  ctx2.beginPath(); ctx2.moveTo(0,H/2); ctx2.lineTo(W,H/2); ctx2.stroke();
+  ctx2.globalAlpha = 1;
+}
+function drawBars(freqData, W, H) {
+  drawBackground(W, H, 0.12);
+  const barCount = 80;
+  const slot = W / barCount;
+  const barW = slot * 0.72;
+  const gap = slot * 0.28;
+  for (let i=0; i<barCount; i++) {
+    const idx = Math.floor(i/barCount*freqData.length*0.65);
+    const v = freqData[idx]/255;
+    const barH = v*H*0.95;
+    const x = i*(barW+gap);
+    const t = i/barCount;
+    const r = t<0.35 ? 255 : Math.round(255*(1-(t-0.35)/0.65));
+    const g = t<0.2 ? Math.round(t*5*229) : t<0.7 ? 229 : Math.round(229*(1-(t-0.7)/0.3));
+    const b = t<0.5 ? Math.round(160*(1-t*2)) : Math.round((t-0.5)*2*200);
+    ctx2.globalAlpha = 0.8 + v*0.2;
+    ctx2.fillStyle = `rgb(${Math.min(255,r)},${Math.min(255,g)},${Math.min(255,b)})`;
+    const rad = Math.min(barW/2, 3);
+    ctx2.beginPath();
+    ctx2.roundRect(x, H-barH, barW, barH, [rad,rad,0,0]);
+    ctx2.fill();
+  }
+  ctx2.globalAlpha = 1;
+}
+function drawRadial(freqData, timeData, W, H, bassLvl) {
+  drawBackground(W, H, 0.10);
+  const cx=W/2, cy=H/2;
+  const baseR = Math.min(W,H)*0.22;
+  const boost = bassLvl/255;
+  ctx2.globalAlpha = 0.1+boost*0.1;
+  ctx2.strokeStyle = '#00e5a0'; ctx2.lineWidth = 1;
+  ctx2.beginPath(); ctx2.arc(cx,cy,baseR+boost*12,0,Math.PI*2); ctx2.stroke();
+  ctx2.globalAlpha = 1;
+  for (let i=0; i<90; i++) {
+    const idx = Math.floor(i/90*freqData.length*0.7);
+    const v = freqData[idx]/255;
+    const angle = (i/90)*Math.PI*2 - Math.PI/2;
+    const r1=baseR, r2=baseR+v*baseR*1.2;
+    const t=i/90;
+    const red = t<0.5 ? Math.round(255*t*2) : 255;
+    const grn = t<0.33 ? Math.round(229*t*3) : t<0.66 ? 229 : Math.round(229*(1-(t-0.66)*3));
+    const blu = t<0.5 ? Math.round(160-t*300) : Math.round((t-0.5)*2*200);
+    ctx2.strokeStyle = `rgba(${clamp(red,0,255)},${clamp(grn,0,255)},${clamp(blu,0,255)},${0.5+v*0.5})`;
+    ctx2.lineWidth = 2;
+    ctx2.beginPath();
+    ctx2.moveTo(cx+Math.cos(angle)*r1, cy+Math.sin(angle)*r1);
+    ctx2.lineTo(cx+Math.cos(angle)*r2, cy+Math.sin(angle)*r2);
+    ctx2.stroke();
+  }
+  ctx2.strokeStyle = 'rgba(0,229,160,0.7)'; ctx2.lineWidth = 1.5;
+  ctx2.beginPath();
+  for (let i=0; i<=360; i++) {
+    const j=Math.floor(i/360*timeData.length);
+    const v=(timeData[j]/128.0-1)*0.4;
+    const angle=(i/360)*Math.PI*2 - Math.PI/2;
+    const r=baseR+v*baseR*(1+boost);
+    const x=cx+Math.cos(angle)*r, y=cy+Math.sin(angle)*r;
+    if(i===0) ctx2.moveTo(x,y); else ctx2.lineTo(x,y);
+  }
+  ctx2.closePath(); ctx2.stroke();
+  ctx2.fillStyle='#00e5a0';
+  ctx2.font=`bold ${Math.round(11+boost*5)}px Space Mono,monospace`;
+  ctx2.textAlign='center'; ctx2.textBaseline='middle';
+  ctx2.globalAlpha=0.4+boost*0.6;
+  ctx2.fillText(bpmEstimate>0 ? bpmEstimate+' BPM' : '♫', cx, cy);
+  ctx2.globalAlpha=1;
+}
+function drawPulse(W, H, bassLvl, midLvl, highLvl) {
+  drawBackground(W, H, 0.18);
+  const cx = W / 2;
+  const cy = H / 2;
+  const bassScale = bassLvl / 255;
+  const midScale = midLvl / 255;
+  const highScale = highLvl / 255;
+  const radii = [30 + bassScale * 60, 55 + midScale * 70, 85 + highScale * 80];
+  const colors = ['#ff4d6d', '#ffd166', '#00e5a0'];
+  radii.forEach((r, i) => {
+    ctx2.globalAlpha = 0.18 + i * 0.08;
+    ctx2.fillStyle = colors[i];
+    ctx2.beginPath(); ctx2.arc(cx, cy, r, 0, Math.PI * 2); ctx2.fill();
+  });
+  ctx2.globalAlpha = 1;
+  ctx2.fillStyle = '#f4f7fb';
+  ctx2.font = '700 15px Space Mono, monospace';
+  ctx2.textAlign = 'center'; ctx2.textBaseline = 'middle';
+  ctx2.fillText('PULSE', cx, cy);
+}
+function drawMirror(freqData, W, H, bassLvl, highLvl) {
+  drawBackground(W, H, 0.14);
+  const half = Math.floor(freqData.length * 0.45);
+  const step = W / half;
+  const centerY = H / 2;
+  ctx2.strokeStyle = '#00e5a0'; ctx2.lineWidth = 1; ctx2.globalAlpha = 0.12;
+  ctx2.beginPath(); ctx2.moveTo(0, centerY); ctx2.lineTo(W, centerY); ctx2.stroke();
+  ctx2.globalAlpha = 1;
+  for (let i = 0; i < half; i += 3) {
+    const v = freqData[i] / 255;
+    const x = i * step;
+    const topH = v * (H * 0.42) * (1 + bassLvl / 255 * 0.4);
+    const bottomH = v * (H * 0.30) * (1 + highLvl / 255 * 0.5);
+    ctx2.strokeStyle = i % 2 === 0 ? '#00b4ff' : '#00e5a0';
+    ctx2.lineWidth = 2;
+    ctx2.beginPath(); ctx2.moveTo(x, centerY - 2); ctx2.lineTo(x, centerY - topH); ctx2.stroke();
+    ctx2.strokeStyle = i % 2 === 0 ? '#ff4d6d' : '#ffd166';
+    ctx2.beginPath(); ctx2.moveTo(x, centerY + 2); ctx2.lineTo(x, centerY + bottomH); ctx2.stroke();
+  }
+}
+function drawRings(freqData, W, H, bassLvl, midLvl, highLvl) {
+  drawBackground(W, H, 0.10);
+  const cx = W / 2, cy = H / 2;
+  [bassLvl, midLvl, highLvl].forEach((lvl, idx) => {
+    const base = 35 + idx * 28;
+    const amp = lvl / 255;
+    const colors = ['#ff4d6d', '#ffd166', '#00e5a0'];
+    ctx2.strokeStyle = colors[idx]; ctx2.lineWidth = 2.5; ctx2.globalAlpha = 0.8;
+    ctx2.beginPath();
+    for (let i = 0; i <= 120; i++) {
+      const p = i / 120;
+      const angle = p * Math.PI * 2 - Math.PI / 2;
+      const sample = freqData[Math.floor(p * freqData.length * 0.55)] / 255;
+      const radius = base + sample * 30 + amp * 24;
+      const x = cx + Math.cos(angle) * radius;
+      const y = cy + Math.sin(angle) * radius;
+      if (i === 0) ctx2.moveTo(x, y); else ctx2.lineTo(x, y);
+    }
+    ctx2.closePath(); ctx2.stroke();
+  });
+  ctx2.globalAlpha = 1;
+}
+function drawGrid(freqData, W, H, bassLvl, avgLvl) {
+  drawBackground(W, H, 0.16);
+  const cols = 12, rows = 6, gap = 8;
+  const cellW = (W - gap * (cols + 1)) / cols;
+  const cellH = (H - gap * (rows + 1)) / rows;
+  const glow = bassLvl / 255;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const idx = Math.floor(((r * cols + c) / (rows * cols)) * freqData.length * 0.7);
+      const v = freqData[idx] / 255;
+      const x = gap + c * (cellW + gap);
+      const y = gap + r * (cellH + gap);
+      const hueMix = (c / cols);
+      const red = Math.round(255 * (1 - hueMix) * v);
+      const green = Math.round(140 + 90 * v);
+      const blue = Math.round(255 * hueMix * v + 100);
+      ctx2.fillStyle = `rgba(${red},${green},${blue},${0.18 + v * 0.75})`;
+      ctx2.beginPath();
+      ctx2.roundRect(x, y, cellW, cellH * (0.45 + v * 0.7), 6);
+      ctx2.fill();
+    }
+  }
+  ctx2.strokeStyle = `rgba(255,255,255,${0.08 + glow * 0.12})`;
+  ctx2.lineWidth = 1; ctx2.strokeRect(0.5, 0.5, W - 1, H - 1);
+  ctx2.fillStyle = '#f4f7fb'; ctx2.globalAlpha = 0.75;
+  ctx2.font = '700 12px Space Mono, monospace'; ctx2.fillText('LEVEL ' + avgLvl, 16, H - 16);
+  ctx2.globalAlpha = 1;
+}
+function drawSpectrum(freqData, W, H, bassLvl, midLvl, highLvl) {
+  drawBackground(W, H, 0.12);
+  const barCount = 56, baseY = H * 0.88, slot = W / barCount, barW = Math.max(3, slot * 0.62);
+  for (let i = 0; i < barCount; i++) {
+    const sample = freqData[Math.floor((i / barCount) * freqData.length * 0.82)] / 255;
+    const eased = Math.pow(sample, 0.85);
+    const barH = eased * H * 0.72;
+    const x = i * slot + (slot - barW) / 2;
+    const grad = ctx2.createLinearGradient(0, baseY - barH, 0, baseY);
+    grad.addColorStop(0, 'rgba(255,77,109,0.95)');
+    grad.addColorStop(0.5, 'rgba(255,209,102,0.95)');
+    grad.addColorStop(1, 'rgba(0,229,160,0.95)');
+    ctx2.fillStyle = grad;
+    ctx2.beginPath(); ctx2.roundRect(x, baseY - barH, barW, barH, [4,4,0,0]); ctx2.fill();
+  }
+  const peak = Math.max(bassLvl, midLvl, highLvl);
+  ctx2.fillStyle = 'rgba(244,247,251,0.85)';
+  ctx2.font = '700 12px Space Mono, monospace'; ctx2.fillText('SPECTRUM ' + peak, 16, 18);
+}
+function drawScope(timeData, W, H, bassLvl, midLvl, highLvl) {
+  drawBackground(W, H, 0.08);
+  const lines = [
+    { color: '#00e5a0', alpha: 1, amp: 0.42 + bassLvl / 255 * 0.2, offset: 0 },
+    { color: '#00b4ff', alpha: 0.55, amp: 0.28 + midLvl / 255 * 0.16, offset: -H * 0.18 },
+    { color: '#ff4d6d', alpha: 0.35, amp: 0.22 + highLvl / 255 * 0.16, offset: H * 0.18 }
+  ];
+  lines.forEach(line => {
+    ctx2.strokeStyle = line.color; ctx2.globalAlpha = line.alpha; ctx2.lineWidth = 2; ctx2.beginPath();
+    for (let i = 0; i < timeData.length; i++) {
+      const x = (i / (timeData.length - 1)) * W;
+      const v = (timeData[i] - 128) / 128;
+      const y = H / 2 + line.offset + v * (H * line.amp);
+      if (i === 0) ctx2.moveTo(x, y); else ctx2.lineTo(x, y);
+    }
+    ctx2.stroke();
+  });
+  ctx2.globalAlpha = 0.12; ctx2.strokeStyle = '#f4f7fb';
+  for (let i = 1; i < 4; i++) { const y = (H / 4) * i; ctx2.beginPath(); ctx2.moveTo(0, y); ctx2.lineTo(W, y); ctx2.stroke(); }
+  ctx2.globalAlpha = 1;
+}
+function drawParticles(freqData, W, H, bassLvl, avgLvl) {
+  drawBackground(W, H, 0.10);
+  const cx = W / 2, cy = H / 2; sparklePhase += 0.02 + avgLvl / 255 * 0.03;
+  const count = 120;
+  for (let i = 0; i < count; i++) {
+    const t = i / count;
+    const idx = Math.floor(t * freqData.length * 0.7);
+    const energy = freqData[idx] / 255;
+    const angle = t * Math.PI * 2 + sparklePhase;
+    const radius = 18 + energy * Math.min(W, H) * 0.42 + (i % 9) * 2;
+    const x = cx + Math.cos(angle) * radius;
+    const y = cy + Math.sin(angle) * radius * 0.7;
+    const size = 1.2 + energy * 5 + (bassLvl / 255) * 2;
+    ctx2.globalAlpha = 0.18 + energy * 0.75;
+    ctx2.fillStyle = i % 3 === 0 ? '#00e5a0' : (i % 3 === 1 ? '#00b4ff' : '#ffd166');
+    ctx2.beginPath(); ctx2.arc(x, y, size, 0, Math.PI * 2); ctx2.fill();
+  }
+  ctx2.globalAlpha = 1; ctx2.fillStyle = '#f4f7fb'; ctx2.font = '700 13px Space Mono, monospace';
+  ctx2.textAlign = 'center'; ctx2.fillText('PARTICLES', cx, cy); ctx2.textAlign = 'left';
+}
+function drawTunnel(freqData, W, H, bassLvl, midLvl, highLvl) {
+  drawBackground(W, H, 0.09);
+  const cx = W / 2, cy = H / 2, rings = 18, maxR = Math.min(W, H) * 0.56;
+  for (let i = rings; i >= 1; i--) {
+    const t = i / rings;
+    const idx = Math.floor(t * freqData.length * 0.72);
+    const energy = freqData[idx] / 255;
+    const r = maxR * t * (0.42 + energy * 0.65);
+    ctx2.strokeStyle = i % 3 === 0 ? 'rgba(0,229,160,0.85)' : (i % 3 === 1 ? 'rgba(0,180,255,0.75)' : 'rgba(255,77,109,0.72)');
+    ctx2.lineWidth = 1 + energy * 3;
+    ctx2.beginPath(); ctx2.ellipse(cx, cy, r, r * (0.55 + midLvl / 255 * 0.2), 0, 0, Math.PI * 2); ctx2.stroke();
+  }
+  const flare = (bassLvl + highLvl) / 510;
+  ctx2.globalAlpha = 0.2 + flare * 0.35; ctx2.fillStyle = '#f4f7fb';
+  ctx2.fillRect(cx - 1, 0, 2, H); ctx2.fillRect(0, cy - 1, W, 2); ctx2.globalAlpha = 1;
+}
+function drawStereo(freqData, W, H, bassLvl, midLvl, highLvl) {
+  drawBackground(W, H, 0.14);
+  const centerGap = Math.max(12, W * 0.02);
+  const leftWidth = (W - centerGap) / 2;
+  const rightX = leftWidth + centerGap;
+  const bars = 22;
+  for (let i = 0; i < bars; i++) {
+    const idxL = Math.floor((i / bars) * freqData.length * 0.35);
+    const idxR = Math.floor((0.35 + i / bars * 0.35) * freqData.length);
+    const vL = freqData[idxL] / 255;
+    const vR = freqData[idxR] / 255;
+    const y = H - ((i + 1) / bars) * H * 0.92;
+    const h = H / bars * 0.68;
+    ctx2.fillStyle = 'rgba(0,229,160,' + (0.18 + vL * 0.72) + ')';
+    ctx2.beginPath(); ctx2.roundRect(leftWidth - vL * leftWidth, y, vL * leftWidth, h, 5); ctx2.fill();
+    ctx2.fillStyle = 'rgba(0,180,255,' + (0.18 + vR * 0.72) + ')';
+    ctx2.beginPath(); ctx2.roundRect(rightX, y, vR * leftWidth, h, 5); ctx2.fill();
+  }
+  ctx2.strokeStyle = 'rgba(255,255,255,0.12)';
+  ctx2.beginPath(); ctx2.moveTo(leftWidth + centerGap / 2, 0); ctx2.lineTo(leftWidth + centerGap / 2, H); ctx2.stroke();
+  ctx2.fillStyle = '#f4f7fb'; ctx2.font = '700 12px Space Mono, monospace';
+  ctx2.fillText('L', 14, 18); ctx2.fillText('R', W - 24, 18);
+}
+
+const captionLangPills = document.getElementById('captionLangPills');
+captionLangPills?.addEventListener('click', e => {
+  const btn = e.target.closest('.lang-pill');
+  if (!btn) return;
+  const lang = btn.dataset.lang;
+  document.getElementById('captionLangSelect').value = lang;
+  document.querySelectorAll('.lang-pill').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  currentRenderedCueKey = '';
+  updateDisplayedCaption(true);
+});
+
+
+settingsBtn.addEventListener('click', openSettings);
+settingsCloseBtn.addEventListener('click', closeSettings);
+settingsBackdrop.addEventListener('click', closeSettings);
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && !settingsModal.hidden) closeSettings();
+});
+
+youtubeFrame.addEventListener('load', () => {
+  if (youtubeFrame.src) {
+    youtubeFrame.hidden = false;
+    videoPlaceholder.hidden = true;
+    setTimeout(() => syncVideoToAudioState(), 900);
+    setTimeout(() => syncVideoToAudioState(), 1700);
+  }
+});
+
+youtubeFrame.addEventListener('load', () => {
+  if (youtubeFrame.src) {
+    youtubeFrame.hidden = false;
+    if (videoPlaceholder) videoPlaceholder.style.display = 'none';
+    muteYouTubeVideo();
+    setTimeout(muteYouTubeVideo, 400);
+    setTimeout(muteYouTubeVideo, 1200);
+  }
+});
+youtubeLoadBtn.addEventListener('click', loadYouTubeVideo);
+videoUploadBtn.addEventListener('click', () => videoFileInput.click());
+videoFileInput.addEventListener('change', e => {
+  if (e.target.files && e.target.files[0]) loadLocalVideoFile(e.target.files[0]);
+});
+youtubeClearBtn.addEventListener('click', clearYouTubeVideo);
+youtubeUrlInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    loadYouTubeVideo();
+  }
+});
+
+
+[audioEl, localVideo].forEach(el => {
+  if (!el) return;
+  el.addEventListener('play', () => {
+    if ((el === localVideo && currentAudioSourceType === 'video') || (el === audioEl && currentAudioSourceType === 'audio')) {
+      syncPlayerStateFromMedia();
+      cancelAnimationFrame(animFrame);
+      draw();
+    }
+  });
+  el.addEventListener('pause', () => {
+    if ((el === localVideo && currentAudioSourceType === 'video') || (el === audioEl && currentAudioSourceType === 'audio')) {
+      syncPlayerStateFromMedia();
+    }
+  });
+  el.addEventListener('ended', () => {
+    if ((el === localVideo && currentAudioSourceType === 'video') || (el === audioEl && currentAudioSourceType === 'audio')) {
+      syncPlayerStateFromMedia();
+      progressFill.style.width = '0%';
+      curTimeEl.textContent = '0:00';
+      if (currentAudioSourceType === 'audio') {
+        syncVideoPause();
+        syncVideoSeek(0);
+      }
+    }
+  });
+  el.addEventListener('loadedmetadata', () => {
+    if ((el === localVideo && currentAudioSourceType === 'video') || (el === audioEl && currentAudioSourceType === 'audio')) {
+      updateTrackDisplay(document.getElementById('trackName').textContent || '—', el.duration || 0);
+    }
+  });
+  el.addEventListener('timeupdate', () => {
+    if ((el === localVideo && currentAudioSourceType === 'video') || (el === audioEl && currentAudioSourceType === 'audio')) {
+      pauseOffset = el.currentTime || 0;
+    }
+  });
+});
+
+
+audioEl.addEventListener('seeked', () => {
+  if (currentAudioSourceType === 'audio') {
+    pauseOffset = audioEl.currentTime || 0;
+    refreshProgressFromActiveMedia();
+    currentRenderedCueKey = '';
+    updateDisplayedCaption(true);
+    syncVideoSeek(pauseOffset);
+  }
+});
+localVideo.addEventListener('seeked', () => {
+  if (currentAudioSourceType === 'video') {
+    pauseOffset = localVideo.currentTime || 0;
+    refreshProgressFromActiveMedia();
+    currentRenderedCueKey = '';
+    updateDisplayedCaption(true);
+  }
+});
+
+
+function drawLoudness(freqData, W, H, bassLvl, midLvl, highLvl) {
+  const overall = (bassLvl * 0.45 + midLvl * 0.35 + highLvl * 0.2) / 255;
+  const meterW = Math.min(90, W * 0.16);
+  const x = (W - meterW) / 2;
+  const y = 14;
+  const meterH = H - 28;
+
+  ctx2.fillStyle = 'rgba(255,255,255,0.06)';
+  ctx2.beginPath();
+  ctx2.roundRect(x, y, meterW, meterH, 18);
+  ctx2.fill();
+
+  const fillH = meterH * overall;
+  const fy = y + meterH - fillH;
+  const grad = ctx2.createLinearGradient(0, y + meterH, 0, y);
+  grad.addColorStop(0, '#00e5a0');
+  grad.addColorStop(0.65, '#ffd166');
+  grad.addColorStop(1, '#ff4d6d');
+  ctx2.fillStyle = grad;
+  ctx2.beginPath();
+  ctx2.roundRect(x + 8, fy + 8, meterW - 16, Math.max(10, fillH - 16), 12);
+  ctx2.fill();
+
+  for (let i = 1; i < 10; i++) {
+    const yy = y + meterH - (meterH / 10) * i;
+    ctx2.strokeStyle = 'rgba(255,255,255,0.12)';
+    ctx2.lineWidth = 1;
+    ctx2.beginPath();
+    ctx2.moveTo(x + 10, yy);
+    ctx2.lineTo(x + meterW - 10, yy);
+    ctx2.stroke();
+  }
+
+  ctx2.fillStyle = '#f0f0f0';
+  ctx2.font = 'bold 12px Space Mono, monospace';
+  ctx2.textAlign = 'center';
+  ctx2.fillText(Math.round(overall * 100) + '%', W / 2, H - 14);
+}
+
+function drawPeakMeter(freqData, W, H, bassLvl, midLvl, highLvl) {
+  const levels = [bassLvl, midLvl, highLvl];
+  const labels = ['BASS', 'MID', 'HIGH'];
+  const colors = ['#ff4d6d', '#ffd166', '#00e5a0'];
+  const colW = Math.min(70, W * 0.16);
+  const gap = Math.min(24, W * 0.04);
+  const totalW = colW * 3 + gap * 2;
+  const startX = (W - totalW) / 2;
+  const meterH = H - 44;
+
+  if (!window._peakHold) window._peakHold = [0, 0, 0];
+
+  for (let i = 0; i < 3; i++) {
+    const x = startX + i * (colW + gap);
+    const norm = levels[i] / 255;
+    const fillH = meterH * norm;
+    const peak = Math.max(window._peakHold[i] * 0.96, norm);
+    window._peakHold[i] = peak;
+
+    ctx2.fillStyle = 'rgba(255,255,255,0.06)';
+    ctx2.beginPath();
+    ctx2.roundRect(x, 12, colW, meterH, 14);
+    ctx2.fill();
+
+    ctx2.fillStyle = colors[i];
+    ctx2.beginPath();
+    ctx2.roundRect(x + 8, 12 + meterH - fillH, colW - 16, fillH, 10);
+    ctx2.fill();
+
+    const peakY = 12 + meterH - meterH * peak;
+    ctx2.strokeStyle = '#ffffff';
+    ctx2.lineWidth = 2;
+    ctx2.beginPath();
+    ctx2.moveTo(x + 8, peakY);
+    ctx2.lineTo(x + colW - 8, peakY);
+    ctx2.stroke();
+
+    ctx2.fillStyle = '#dfe6ee';
+    ctx2.font = 'bold 11px Space Mono, monospace';
+    ctx2.textAlign = 'center';
+    ctx2.fillText(labels[i], x + colW / 2, H - 10);
+  }
+}
+
+function drawLevelSteps(freqData, W, H, bassLvl, midLvl, highLvl) {
+  const overall = (bassLvl + midLvl + highLvl) / 3;
+  const steps = 20;
+  const activeSteps = Math.round((overall / 255) * steps);
+  const gap = 8;
+  const stepW = (W - gap * (steps - 1) - 24) / steps;
+  const baseY = H * 0.58;
+
+  for (let i = 0; i < steps; i++) {
+    const x = 12 + i * (stepW + gap);
+    const levelScale = 0.35 + (i / (steps - 1)) * 0.65;
+    const stepH = H * 0.12 + H * 0.36 * levelScale;
+    const y = baseY - stepH / 2;
+    let color = 'rgba(255,255,255,0.10)';
+    if (i < activeSteps) {
+      const t = i / (steps - 1);
+      if (t < 0.6) color = '#00e5a0';
+      else if (t < 0.85) color = '#ffd166';
+      else color = '#ff4d6d';
+    }
+    ctx2.fillStyle = color;
+    ctx2.beginPath();
+    ctx2.roundRect(x, y, stepW, stepH, 8);
+    ctx2.fill();
+  }
+
+  ctx2.fillStyle = '#f0f0f0';
+  ctx2.font = 'bold 12px Space Mono, monospace';
+  ctx2.textAlign = 'center';
+  ctx2.fillText('LOUDNESS STEPS', W / 2, H - 12);
+}
+
+
+function drawFreqBars(freqData, W, H) {
+  const groups = 24;
+  const usable = Math.floor(freqData.length * 0.72);
+  const groupSize = Math.max(1, Math.floor(usable / groups));
+  const slot = W / groups;
+  const barW = Math.max(4, slot * 0.68);
+
+  for (let i = 0; i < groups; i++) {
+    let sum = 0;
+    const start = i * groupSize;
+    const end = Math.min(usable, start + groupSize);
+    for (let j = start; j < end; j++) sum += freqData[j];
+    const avg = sum / Math.max(1, end - start);
+    const v = avg / 255;
+    const barH = Math.max(4, v * (H - 26));
+    const x = i * slot + (slot - barW) / 2;
+    const y = H - barH - 8;
+
+    const t = i / (groups - 1);
+    ctx2.fillStyle = t < 0.45 ? '#00e5a0' : t < 0.78 ? '#ffd166' : '#ff4d6d';
+    ctx2.beginPath();
+    ctx2.roundRect(x, y, barW, barH, 6);
+    ctx2.fill();
+  }
+
+  ctx2.strokeStyle = 'rgba(255,255,255,0.08)';
+  ctx2.beginPath();
+  ctx2.moveTo(0, H - 8);
+  ctx2.lineTo(W, H - 8);
+  ctx2.stroke();
+}
+
+function drawCenterWave(timeData, W, H, bassLvl, midLvl, highLvl) {
+  const amp = 0.75 + (bassLvl + midLvl + highLvl) / (255 * 3) * 0.9;
+  const layers = [
+    { color: '#00e5a0', width: 3.2, scale: 0.90 },
+    { color: '#00b4ff', width: 2.1, scale: 0.62 },
+    { color: '#ffd166', width: 1.6, scale: 0.42 }
+  ];
+
+  layers.forEach(layer => {
+    ctx2.strokeStyle = layer.color;
+    ctx2.lineWidth = layer.width;
+    ctx2.beginPath();
+    const slice = W / timeData.length;
+    for (let i = 0; i < timeData.length; i++) {
+      const v = (timeData[i] / 128) - 1;
+      const x = i * slice;
+      const y = H / 2 + v * (H * 0.36) * amp * layer.scale;
+      if (i === 0) ctx2.moveTo(x, y);
+      else ctx2.lineTo(x, y);
+    }
+    ctx2.stroke();
+  });
+
+  ctx2.strokeStyle = 'rgba(255,255,255,0.10)';
+  ctx2.lineWidth = 1;
+  ctx2.beginPath();
+  ctx2.moveTo(0, H / 2);
+  ctx2.lineTo(W, H / 2);
+  ctx2.stroke();
+}
+
+function drawBandPulse(freqData, W, H, bassLvl, midLvl, highLvl) {
+  const bands = [
+    { label: 'LOW', value: bassLvl, color: '#00e5a0' },
+    { label: 'MID', value: midLvl, color: '#ffd166' },
+    { label: 'HIGH', value: highLvl, color: '#ff4d6d' }
+  ];
+  const gap = 18;
+  const cardW = (W - gap * 4) / 3;
+  const baseY = 22;
+  const maxH = H - 56;
+
+  bands.forEach((band, i) => {
+    const x = gap + i * (cardW + gap);
+    const norm = band.value / 255;
+    const h = Math.max(8, maxH * norm);
+
+    ctx2.fillStyle = 'rgba(255,255,255,0.05)';
+    ctx2.beginPath();
+    ctx2.roundRect(x, baseY, cardW, maxH, 16);
+    ctx2.fill();
+
+    ctx2.fillStyle = band.color;
+    ctx2.beginPath();
+    ctx2.roundRect(x + 8, baseY + maxH - h - 8, cardW - 16, h, 12);
+    ctx2.fill();
+
+    ctx2.fillStyle = '#f0f0f0';
+    ctx2.font = 'bold 12px Space Mono, monospace';
+    ctx2.textAlign = 'center';
+    ctx2.fillText(band.label, x + cardW / 2, H - 12);
+  });
+}
+
+
+function drawStack(freqData, W, H) {
+  const bands = 30;
+  const slice = Math.floor(freqData.length / bands);
+  const barW = W / bands;
+
+  for (let i = 0; i < bands; i++) {
+    let sum = 0;
+    for (let j = i * slice; j < (i + 1) * slice; j++) sum += freqData[j];
+    const avg = sum / slice;
+    const h = (avg / 255) * H * 0.9;
+
+    ctx2.fillStyle = 'rgba(255,255,255,0.08)';
+    ctx2.fillRect(i * barW, H - h, barW - 2, h);
+
+    ctx2.fillStyle = '#00e5a0';
+    ctx2.fillRect(i * barW, H - h, barW - 2, h * 0.5);
+
+    ctx2.fillStyle = '#ffd166';
+    ctx2.fillRect(i * barW, H - h * 0.5, barW - 2, h * 0.25);
+
+    ctx2.fillStyle = '#ff4d6d';
+    ctx2.fillRect(i * barW, H - h * 0.25, barW - 2, h * 0.25);
+  }
+}
+
+function drawLineSpectrum(freqData, W, H) {
+  const len = freqData.length * 0.7;
+  const step = W / len;
+
+  ctx2.strokeStyle = '#00e5a0';
+  ctx2.lineWidth = 2;
+  ctx2.beginPath();
+
+  for (let i = 0; i < len; i++) {
+    const v = freqData[i] / 255;
+    const x = i * step;
+    const y = H - v * H * 0.8;
+
+    if (i === 0) ctx2.moveTo(x, y);
+    else ctx2.lineTo(x, y);
+  }
+
+  ctx2.stroke();
+}
+
+</script>
+</body>
+</html>

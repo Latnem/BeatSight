@@ -580,15 +580,13 @@ canvas { display: block; width: 100%; height: 100%; }
   <button class="mode-btn active" data-mode="wave">WAVE</button>
   <button class="mode-btn" data-mode="bars">BARS</button>
   <button class="mode-btn" data-mode="radial">RADIAL</button>
-  <button class="mode-btn" data-mode="pulse">PULSE</button>
-  <button class="mode-btn" data-mode="mirror">MIRROR</button>
-  <button class="mode-btn" data-mode="rings">RINGS</button>
-  <button class="mode-btn" data-mode="grid">GRID</button>
   <button class="mode-btn" data-mode="spectrum">SPECTRUM</button>
   <button class="mode-btn" data-mode="scope">SCOPE</button>
-  <button class="mode-btn" data-mode="particles">PARTICLES</button>
-  <button class="mode-btn" data-mode="tunnel">TUNNEL</button>
+  <button class="mode-btn" data-mode="mirror">MIRROR</button>
   <button class="mode-btn" data-mode="stereo">STEREO</button>
+  <button class="mode-btn" data-mode="loudness">LOUDNESS</button>
+  <button class="mode-btn" data-mode="peak">PEAK</button>
+  <button class="mode-btn" data-mode="level">LEVEL</button>
 </div>
 
 <div class="media-stage video-hidden">
@@ -2034,6 +2032,122 @@ localVideo.addEventListener('seeked', () => {
     updateDisplayedCaption(true);
   }
 });
+
+
+function drawLoudness(freqData, W, H, bassLvl, midLvl, highLvl) {
+  const overall = (bassLvl * 0.45 + midLvl * 0.35 + highLvl * 0.2) / 255;
+  const meterW = Math.min(90, W * 0.16);
+  const x = (W - meterW) / 2;
+  const y = 14;
+  const meterH = H - 28;
+
+  ctx2.fillStyle = 'rgba(255,255,255,0.06)';
+  ctx2.beginPath();
+  ctx2.roundRect(x, y, meterW, meterH, 18);
+  ctx2.fill();
+
+  const fillH = meterH * overall;
+  const fy = y + meterH - fillH;
+  const grad = ctx2.createLinearGradient(0, y + meterH, 0, y);
+  grad.addColorStop(0, '#00e5a0');
+  grad.addColorStop(0.65, '#ffd166');
+  grad.addColorStop(1, '#ff4d6d');
+  ctx2.fillStyle = grad;
+  ctx2.beginPath();
+  ctx2.roundRect(x + 8, fy + 8, meterW - 16, Math.max(10, fillH - 16), 12);
+  ctx2.fill();
+
+  for (let i = 1; i < 10; i++) {
+    const yy = y + meterH - (meterH / 10) * i;
+    ctx2.strokeStyle = 'rgba(255,255,255,0.12)';
+    ctx2.lineWidth = 1;
+    ctx2.beginPath();
+    ctx2.moveTo(x + 10, yy);
+    ctx2.lineTo(x + meterW - 10, yy);
+    ctx2.stroke();
+  }
+
+  ctx2.fillStyle = '#f0f0f0';
+  ctx2.font = 'bold 12px Space Mono, monospace';
+  ctx2.textAlign = 'center';
+  ctx2.fillText(Math.round(overall * 100) + '%', W / 2, H - 14);
+}
+
+function drawPeakMeter(freqData, W, H, bassLvl, midLvl, highLvl) {
+  const levels = [bassLvl, midLvl, highLvl];
+  const labels = ['BASS', 'MID', 'HIGH'];
+  const colors = ['#ff4d6d', '#ffd166', '#00e5a0'];
+  const colW = Math.min(70, W * 0.16);
+  const gap = Math.min(24, W * 0.04);
+  const totalW = colW * 3 + gap * 2;
+  const startX = (W - totalW) / 2;
+  const meterH = H - 44;
+
+  if (!window._peakHold) window._peakHold = [0, 0, 0];
+
+  for (let i = 0; i < 3; i++) {
+    const x = startX + i * (colW + gap);
+    const norm = levels[i] / 255;
+    const fillH = meterH * norm;
+    const peak = Math.max(window._peakHold[i] * 0.96, norm);
+    window._peakHold[i] = peak;
+
+    ctx2.fillStyle = 'rgba(255,255,255,0.06)';
+    ctx2.beginPath();
+    ctx2.roundRect(x, 12, colW, meterH, 14);
+    ctx2.fill();
+
+    ctx2.fillStyle = colors[i];
+    ctx2.beginPath();
+    ctx2.roundRect(x + 8, 12 + meterH - fillH, colW - 16, fillH, 10);
+    ctx2.fill();
+
+    const peakY = 12 + meterH - meterH * peak;
+    ctx2.strokeStyle = '#ffffff';
+    ctx2.lineWidth = 2;
+    ctx2.beginPath();
+    ctx2.moveTo(x + 8, peakY);
+    ctx2.lineTo(x + colW - 8, peakY);
+    ctx2.stroke();
+
+    ctx2.fillStyle = '#dfe6ee';
+    ctx2.font = 'bold 11px Space Mono, monospace';
+    ctx2.textAlign = 'center';
+    ctx2.fillText(labels[i], x + colW / 2, H - 10);
+  }
+}
+
+function drawLevelSteps(freqData, W, H, bassLvl, midLvl, highLvl) {
+  const overall = (bassLvl + midLvl + highLvl) / 3;
+  const steps = 20;
+  const activeSteps = Math.round((overall / 255) * steps);
+  const gap = 8;
+  const stepW = (W - gap * (steps - 1) - 24) / steps;
+  const baseY = H * 0.58;
+
+  for (let i = 0; i < steps; i++) {
+    const x = 12 + i * (stepW + gap);
+    const levelScale = 0.35 + (i / (steps - 1)) * 0.65;
+    const stepH = H * 0.12 + H * 0.36 * levelScale;
+    const y = baseY - stepH / 2;
+    let color = 'rgba(255,255,255,0.10)';
+    if (i < activeSteps) {
+      const t = i / (steps - 1);
+      if (t < 0.6) color = '#00e5a0';
+      else if (t < 0.85) color = '#ffd166';
+      else color = '#ff4d6d';
+    }
+    ctx2.fillStyle = color;
+    ctx2.beginPath();
+    ctx2.roundRect(x, y, stepW, stepH, 8);
+    ctx2.fill();
+  }
+
+  ctx2.fillStyle = '#f0f0f0';
+  ctx2.font = 'bold 12px Space Mono, monospace';
+  ctx2.textAlign = 'center';
+  ctx2.fillText('LOUDNESS STEPS', W / 2, H - 12);
+}
 
 </script>
 </body>

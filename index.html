@@ -47,15 +47,6 @@ body {
   color: #d2d8e2;
 }
 
-.track-info {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 12px;
-  flex-shrink: 0;
-  background: rgba(255,255,255,0.08);
-  border-radius: 12px;
-}
 .track-icon { font-size: 18px; }
 .track-name {
   font-size: 14px;
@@ -227,12 +218,6 @@ canvas {
   <span class="subtitle">NUEVAYoL</span>
 </div>
 
-<div class="track-info">
-  <span class="track-icon">♫</span>
-  <span class="track-name" id="trackName">NUEVAYoL-BAD BUNNY</span>
-  <span class="track-dur" id="trackDur">0:00</span>
-</div>
-
 <div class="mode-row">
   <button class="mode-btn active" data-mode="wave">WAVE</button>
   <button class="mode-btn" data-mode="bars">BARS</button>
@@ -320,7 +305,6 @@ const playIcon = document.getElementById('playIcon');
 const progressFill = document.getElementById('progressFill');
 const curTimeEl = document.getElementById('curTime');
 const totTimeEl = document.getElementById('totTime');
-const trackDur = document.getElementById('trackDur');
 const beatFlash = document.getElementById('beatFlash');
 const beatDots = document.querySelectorAll('.beat-dot');
 const bassBar = document.getElementById('bassBar');
@@ -440,7 +424,6 @@ danceFrame.addEventListener('load', () => {
 audioEl.addEventListener('loadedmetadata', () => {
   const d = Number(audioEl.duration || 0);
   totTimeEl.textContent = fmt(d);
-  trackDur.textContent = fmt(d);
 });
 
 audioEl.addEventListener('timeupdate', () => {

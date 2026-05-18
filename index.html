@@ -192,6 +192,7 @@ canvas{
   display:flex;
   align-items:center;
   gap:12px;
+  flex-shrink:0;
 }
 
 .play-btn{
@@ -250,84 +251,6 @@ canvas{
   background:linear-gradient(90deg,#00e5a0,#00b4ff);
 }
 
-.metrics{
-  display:grid;
-  grid-template-columns:repeat(4,1fr);
-  gap:10px;
-}
-
-.metric-card{
-  background:rgba(255,255,255,.06);
-  border-radius:12px;
-  border:.5px solid #40495a;
-  padding:12px;
-  text-align:center;
-}
-
-.metric-label{
-  font-size:10px;
-  color:#d2d8e2;
-  font-family:'Space Mono',monospace;
-  text-transform:uppercase;
-  letter-spacing:.08em;
-  margin-bottom:8px;
-}
-
-.metric-bar-wrap{
-  height:6px;
-  background:#4b5568;
-  border-radius:3px;
-  overflow:hidden;
-  margin-bottom:8px;
-}
-
-.metric-bar{
-  height:100%;
-  width:0%;
-}
-
-.bass-bar{
-  background:#ff4d6d;
-}
-
-.mid-bar{
-  background:#ffd166;
-}
-
-.high-bar{
-  background:#00e5a0;
-}
-
-.metric-val{
-  font-size:18px;
-  font-weight:800;
-}
-
-.bass-val{
-  color:#ff4d6d;
-}
-
-.mid-val{
-  color:#ffd166;
-}
-
-.high-val{
-  color:#00e5a0;
-}
-
-.pulse-grid{
-  display:flex;
-  gap:7px;
-  justify-content:center;
-}
-
-.beat-dot{
-  width:12px;
-  height:12px;
-  border-radius:50%;
-  background:#414a5d;
-}
-
 @media (max-width:980px){
 
   body{
@@ -340,10 +263,6 @@ canvas{
 
   .video-column{
     grid-template-rows:300px 300px;
-  }
-
-  .metrics{
-    grid-template-columns:repeat(2,1fr);
   }
 }
 
@@ -448,63 +367,6 @@ canvas{
     <div class="progress-bar" id="progressBar">
       <div class="progress-fill" id="progressFill"></div>
     </div>
-
-  </div>
-
-</div>
-
-<div class="metrics">
-
-  <div class="metric-card">
-
-    <div class="metric-label">Beat Pulse</div>
-
-    <div class="pulse-grid">
-      <div class="beat-dot"></div>
-      <div class="beat-dot"></div>
-      <div class="beat-dot"></div>
-      <div class="beat-dot"></div>
-      <div class="beat-dot"></div>
-      <div class="beat-dot"></div>
-      <div class="beat-dot"></div>
-      <div class="beat-dot"></div>
-    </div>
-
-  </div>
-
-  <div class="metric-card">
-
-    <div class="metric-label">Bass</div>
-
-    <div class="metric-bar-wrap">
-      <div class="metric-bar bass-bar"></div>
-    </div>
-
-    <div class="metric-val bass-val">0</div>
-
-  </div>
-
-  <div class="metric-card">
-
-    <div class="metric-label">Mid</div>
-
-    <div class="metric-bar-wrap">
-      <div class="metric-bar mid-bar"></div>
-    </div>
-
-    <div class="metric-val mid-val">0</div>
-
-  </div>
-
-  <div class="metric-card">
-
-    <div class="metric-label">High</div>
-
-    <div class="metric-bar-wrap">
-      <div class="metric-bar high-bar"></div>
-    </div>
-
-    <div class="metric-val high-val">0</div>
 
   </div>
 

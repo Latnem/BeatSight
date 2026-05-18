@@ -97,7 +97,7 @@ body {
 
 .media-stage {
   display: grid;
-  grid-template-columns: minmax(0, 1.12fr) minmax(360px, 0.88fr);
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.78fr) minmax(280px, 0.78fr);
   gap: 12px;
   flex: 1 1 auto;
   min-height: 0;
@@ -148,6 +148,27 @@ canvas {
 }
 .video-zoom-controls button:hover {
   background: rgba(0,0,0,0.82);
+}
+
+
+.dance-panel {
+  background: rgba(255,255,255,0.06);
+  border-radius: 16px;
+  border: 0.5px solid #40495a;
+  overflow: hidden;
+  position: relative;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dance-video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #111827;
+  display: block;
 }
 
 .youtube-frame {
@@ -272,7 +293,7 @@ canvas {
 @media (max-width: 980px) {
   body { overflow: auto; min-height: 100dvh; }
   .media-stage { grid-template-columns: 1fr; flex: 0 0 auto; }
-  .viz-container, .video-panel { min-height: 300px; }
+  .viz-container, .video-panel, .dance-panel { min-height: 260px; }
   .metrics { grid-template-columns: repeat(2, 1fr); }
 }
 </style>
@@ -308,6 +329,13 @@ canvas {
   <div class="viz-container">
     <canvas id="vizCanvas"></canvas>
     <div class="beat-flash" id="beatFlash"></div>
+  </div>
+
+  <div class="dance-panel">
+    <video class="dance-video" controls preload="metadata">
+      <source src="dance.mp4" type="video/mp4">
+      Your browser does not support the dance practice video.
+    </video>
   </div>
 
   <div class="video-panel">

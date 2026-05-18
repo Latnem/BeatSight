@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BeatSight — </title>
-<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<title>BeatSight</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Michroma&display=swap" rel="stylesheet">
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100%; }
@@ -41,7 +41,24 @@ body {
   0%, 100% { transform: scale(1); opacity: 1; }
   50% { transform: scale(1.6); opacity: 0.4; }
 }
-.title { font-size: 20px; font-weight: 800; letter-spacing: 0.04em; }
+.title-bold {
+  font-weight: 700;
+}
+
+.title-light {
+  font-weight: 400;
+  opacity: 0.88;
+}
+
+.title {
+  font-family: 'Michroma', sans-serif;
+  font-size: 20px;
+  letter-spacing: 0.08em;
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  color: #f0f0f0;
+}
 .mode-row {
   display: flex;
   gap: 8px;
@@ -141,12 +158,15 @@ canvas {
 .controls {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   flex-shrink: 0;
+  min-height: 36px;
 }
 .play-btn {
-  width: 46px;
-  height: 46px;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
   border-radius: 50%;
   background: #00e5a0;
   border: none;
@@ -156,6 +176,8 @@ canvas {
   justify-content: center;
   transition: transform 0.15s, background 0.15s;
   flex-shrink: 0;
+  padding: 0;
+  z-index: 5;
 }
 .play-btn:hover { transform: scale(1.05); background: #00ffb3; }
 .play-btn:active { transform: scale(0.95); }
@@ -197,7 +219,7 @@ canvas {
 
 <div class="header">
   <div class="pulse-dot"></div>
-  <span class="title">BeatSight</span>
+  <span class="title"><span class="title-bold">Beat</span><span class="title-light">Sight</span></span>
   <div class="mode-row">
   <button class="mode-btn active" data-mode="wave">WAVE</button>
   <button class="mode-btn" data-mode="bars">BARS</button>

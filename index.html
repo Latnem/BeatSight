@@ -27,7 +27,7 @@ body{
   display:flex;
   flex-direction:column;
   gap:12px;
-  width:min(100%,1600px);
+  width:min(100%,1800px);
   margin:0 auto;
   padding:18px;
   overflow:hidden;
@@ -107,7 +107,7 @@ body{
 
 .media-stage{
   display:grid;
-  grid-template-columns:minmax(0,1fr) minmax(520px,.95fr);
+  grid-template-columns:minmax(0,.8fr) minmax(820px,1.5fr);
   gap:12px;
   flex:1 1 auto;
   min-height:0;
@@ -128,6 +128,10 @@ body{
   min-height:0;
 }
 
+.video-panel{
+  height:100%;
+}
+
 canvas{
   width:100%;
   height:100%;
@@ -137,6 +141,7 @@ canvas{
 .youtube-frame{
   width:100%;
   height:100%;
+  min-height:100%;
   border:0;
   display:block;
   background:#111827;
@@ -250,7 +255,7 @@ canvas{
   }
 
   .video-panel{
-    min-height:320px;
+    min-height:420px;
   }
 }
 
@@ -293,11 +298,6 @@ canvas{
   <div class="video-column">
 
     <div class="video-panel">
-
-      <div class="video-zoom-controls">
-        <button id="zoomOut">−</button>
-        <button id="zoomIn">+</button>
-      </div>
 
       <iframe
         id="youtubeFrame"
